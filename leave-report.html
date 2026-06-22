@@ -267,6 +267,7 @@ tbody td { padding: 8px 12px; color: var(--text); vertical-align: middle; }
 <script>
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 let allData = [];
+let dataLoaded = false;
 
 const TH_M_FULL = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -298,17 +299,47 @@ function nowTH() {
   document.getElementById('f-month').value = mm;
 })();
 
-window.onload = loadData;
+window.onload = initPage;
+
+function showPrompt() {
+  document.getElementById('report-inner').innerHTML =
+    '<div class="empty-state"><div class="ei">🗂️</div><p>กรุณาเลือกแผนก แล้วกด <strong>แสดงรายงาน</strong></p></div>';
+}
+
+// โหลดแค่รายชื่อแผนกตอนเปิดหน้า — ไม่ดึง leaves อัตโนมัติ
+async function initPage() {
+  showPrompt();
+  if (!API) return;
+  try {
+    let depts = [];
+    if (window.DataCache) {
+      const deptMap = await DataCache.getDepts();
+      depts = Object.keys(deptMap||{}).sort();
+    } else {
+      const res = await fetch(API+'?action=getDepts');
+      const map = await res.json() || {};
+      depts = Object.keys(map).sort();
+    }
+    const sel = document.getElementById('f-dept');
+    sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
+    depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`);
+  } catch(e) { /* ถ้า getDepts ไม่มี ปล่อยผ่าน */ }
+}
 
 async function loadData(force) {
-  document.getElementById('report-inner').innerHTML = '<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
   if (!API) { document.getElementById('report-inner').innerHTML = '<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
+  document.getElementById('report-inner').innerHTML = '<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
   try {
     allData = window.DataCache ? await DataCache.getLeaves(force) : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
+    dataLoaded = true;
     const depts = [...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
     const sel = document.getElementById('f-dept'); const cur = sel.value;
-    sel.innerHTML = '<option value="">ทุกแผนก</option>';
-    depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+    const existing = [...sel.options].map(o=>o.value).filter(v=>v&&v!=='ALL');
+    if (depts.some(d=>!existing.includes(d))) {
+      sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
+      depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+      if (cur) sel.value = cur;
+    }
     genReport();
   } catch(e) {
     document.getElementById('report-inner').innerHTML = `<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${esc(e.message)}</small></p></div>`;
@@ -317,10 +348,11 @@ async function loadData(force) {
 
 function filterRows() {
   const dept   = document.getElementById('f-dept').value;
+  const deptFilter = dept === 'ALL' ? '' : dept;
   const month  = document.getElementById('f-month').value;
   const search = (document.getElementById('f-search').value||'').trim().toLowerCase();
   return allData.filter(r => {
-    if (dept && r.dept !== dept) return false;
+    if (deptFilter && r.dept !== deptFilter) return false;
     if (month) {
       const from = r.dateFrom||'', to = r.dateTo||r.dateFrom||'';
       if (!from) return false;
@@ -339,99 +371,22 @@ function filterRows() {
 }
 
 function genReport() {
+  const dept = document.getElementById('f-dept').value;
+
+  // ต้องเลือกแผนกก่อน
+  if (!dept) { showPrompt(); return; }
+
+  // ถ้ายังไม่โหลด leaves ให้โหลดก่อน
+  if (!dataLoaded) { loadData(false); return; }
+
   const rows   = filterRows();
-  const dept   = document.getElementById('f-dept').value;
   const month  = document.getElementById('f-month').value;
   const search = (document.getElementById('f-search').value||'').trim();
-  const unitName = sessionStorage.getItem('unitName') || '';
-
-  // ── subtitle text ──
-  let subtitle = '';
-  if (dept)  subtitle += `แผนก: ${dept}`;
-  if (month) subtitle += (subtitle?'  |  ':'') + `เดือน: ${TH_M_FULL[+month]}`;
-  if (search) subtitle += (subtitle?'  |  ':'') + `ค้นหา: "${search}"`;
-  if (!subtitle) subtitle = 'แสดงข้อมูลทั้งหมด';
-
-  // ── sort newest first ──
-  const indexed = rows.map((r,_)=>({r,idx:allData.indexOf(r)}));
-  indexed.sort((a,b)=>b.idx-a.idx);
-
-  // ── summary counts ──
-  const sumCounts = {};
-  TYPE_SUM.forEach(t => sumCounts[t] = rows.filter(r=>r.leaveType===t).length);
-
-  // ── logo ──
-  const logoHtml = `<img src="logowing23.png" class="rpt-logo" alt="logo" onerror="this.style.display='none'">`;
-
-  // ── header ──
-  let html = `
-  <div class="rpt-header">
-    ${logoHtml}
-    <div class="rpt-title-block">
-      <div class="rpt-org">${esc(unitName) || 'ระบบบันทึกการจำหน่าย'}</div>
-      <div class="rpt-title">รายงานสถานะการจำหน่ายกำลังพล</div>
-      <div class="rpt-sub">${esc(subtitle)}</div>
-    </div>
-    <div class="rpt-meta">
-      <div>พิมพ์เมื่อ</div>
-      <div><strong>${nowTH()}</strong></div>
-      <div style="margin-top:4px">รายการทั้งหมด <strong>${rows.length}</strong> รายการ</div>
-    </div>
-  </div>`;
-
-  // ── summary badges ──
-  html += `<div class="rpt-summary">
-    <span class="sum-badge sum-total">📋 รวม ${rows.length} รายการ</span>`;
-  TYPE_SUM.forEach(t => {
-    if (sumCounts[t] > 0) html += `<span class="sum-badge ${TYPE_CLS[t]}">${TYPE_ICON[t]||''} ${t} ${sumCounts[t]}</span>`;
-  });
-  html += `</div>`;
-
-  // ── table ──
-  if (rows.length === 0) {
-    html += `<div class="empty-state"><div class="ei">📭</div><p>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</p></div>`;
-  } else {
-    html += `<div class="rpt-table-wrap"><table>
-      <thead><tr>
-        <th style="width:32px">#</th>
-        <th>ชื่อ - นามสกุล</th>
-        <th>แผนก</th>
-        <th>ประเภท</th>
-        <th>วันที่ไป</th>
-        <th>วันที่กลับ</th>
-        <th style="text-align:center">จำนวน</th>
-      </tr></thead>
-      <tbody>`;
-    indexed.forEach(({r,idx}, pos) => {
-      const days = dayCount(r.dateFrom, r.dateTo);
-      const icon = TYPE_ICON[r.leaveType] || '';
-      html += `<tr>
-        <td class="no-col">${pos+1}</td>
-        <td style="font-weight:600">${esc(r.name||'-')}</td>
-        <td><span class="dept-tag">${esc(r.dept||'-')}</span></td>
-        <td><span class="badge b-${esc(r.leaveType)}">${icon} ${esc(r.leaveType)}</span></td>
-        <td style="white-space:nowrap">${thDate(r.dateFrom)}</td>
-        <td style="white-space:nowrap">${thDate(r.dateTo)}</td>
-        <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
-      </tr>`;
-    });
-    html += `</tbody></table></div>`;
-  }
-
-  // ── footer ──
-  html += `<div class="rpt-footer">
-    <div>รายงานนี้ผลิตโดยระบบบันทึกการจำหน่าย${unitName?' · '+unitName:''}</div>
-    <div>พิมพ์เมื่อ ${nowTH()}</div>
-  </div>`;
-
-  document.getElementById('report-inner').innerHTML = html;
-}
-
 function clearFilters() {
   document.getElementById('f-dept').value  = '';
-  document.getElementById('f-month').value = '';
+  document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
   document.getElementById('f-search').value = '';
-  genReport();
+  showPrompt();
 }
 
 function printReport() {

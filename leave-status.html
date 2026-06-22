@@ -365,7 +365,35 @@ function showToast(msg,type) { const t=document.getElementById('toast'); t.inner
   document.getElementById('f-month').value = mm;
 })();
 
-window.onload = loadData;
+window.onload = initPage;
+
+// แสดง placeholder ตั้งแต่แรก — ไม่ดึง leaves อัตโนมัติ
+async function initPage() {
+  showPrompt();
+  if (!API) return;
+  try {
+    // โหลดแค่รายชื่อแผนก (เร็ว) เพื่อเติม dropdown
+    let depts = [];
+    if (window.DataCache) {
+      const deptMap = await DataCache.getDepts();
+      depts = Object.keys(deptMap||{}).sort();
+    } else {
+      const res = await fetch(API+'?action=getDepts');
+      const map = await res.json() || {};
+      depts = Object.keys(map).sort();
+    }
+    const sel = document.getElementById('f-dept');
+    sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
+    depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`);
+  } catch(e) { /* ถ้า getDepts ไม่มี ปล่อยผ่าน — ยังกดแสดงได้ */ }
+}
+
+function showPrompt() {
+  document.getElementById('tbody').innerHTML =
+    '<div class="empty-state"><div class="ei">🗂️</div><p>กรุณาเลือกแผนก แล้วกด <strong>แสดง</strong></p></div>';
+  TYPES.forEach(t => { document.getElementById('s-'+t).innerText = '—'; });
+  document.getElementById('t-count').innerText = '';
+}
 
 async function loadData(force) {
   if (!API) { document.getElementById('tbody').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
@@ -373,10 +401,15 @@ async function loadData(force) {
   try {
     allData = window.DataCache ? await DataCache.getLeaves(force) : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
     dataLoaded = true;
-    const depts=[...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
-    const sel=document.getElementById('f-dept'); const cur=sel.value;
-    sel.innerHTML='<option value="">ทุกแผนก</option>';
-    depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+    // sync dept dropdown ถ้าข้อมูลมาจาก getLeaves
+    const depts = [...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
+    const sel = document.getElementById('f-dept'); const cur = sel.value;
+    const existing = [...sel.options].map(o=>o.value).filter(v=>v&&v!=='ALL');
+    if (depts.some(d=>!existing.includes(d))) {
+      sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
+      depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+      if (cur) sel.value = cur;
+    }
     applyFilters();
   } catch(e) {
     document.getElementById('tbody').innerHTML=`<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${e.message}</small></p></div>`;
@@ -385,49 +418,44 @@ async function loadData(force) {
 }
 
 function onFilterChange() {
-  // If data already loaded, apply immediately; otherwise wait for explicit search
   if (dataLoaded) applyFilters();
 }
 
 function applyFilters() {
+  const dept   = document.getElementById('f-dept').value;
+  const month  = document.getElementById('f-month').value;
+  const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+
+  // ต้องเลือกแผนกก่อนเสมอ
+  if (!dept) {
+    showPrompt();
+    return;
+  }
+
+  // ถ้ายังไม่ได้โหลดข้อมูลเลย ให้โหลดก่อน (จะ call applyFilters อีกครั้งหลังโหลดเสร็จ)
   if (!dataLoaded) {
     loadData(false);
     return;
   }
-  const dept = document.getElementById('f-dept').value;
-  const month = document.getElementById('f-month').value;
-  const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+
+  const deptFilter = dept === 'ALL' ? '' : dept;
 
   let rows = allData.filter(r => {
-    if (dept && r.dept !== dept) return false;
+    if (deptFilter && r.dept !== deptFilter) return false;
     if (month) {
-      // Check if month overlaps with dateFrom/dateTo range
       const from = r.dateFrom || '', to = r.dateTo || r.dateFrom || '';
       if (!from) return false;
-      const fromMM = from.slice(5,7), toMM = to.slice(5,7);
-      const fromYYYY = from.slice(0,4), toYYYY = to.slice(0,4);
-      // Build month keys for range
-      const startKey = fromYYYY+'-'+fromMM, endKey = toYYYY+'-'+toMM;
-      const now = new Date();
-      const yr = String(now.getFullYear());
-      const testKey = yr+'-'+month;
-      // Simple overlap: if testKey is between startKey and endKey (same year assumption is ok here)
-      if (testKey < startKey || testKey > endKey) {
-        // Also check cross-year: if start is this year or previous, and end covers month
-        const startDate = new Date(fromYYYY, Number(fromMM)-1, 1);
-        const endDate = new Date(toYYYY, Number(toMM)-1, 28);
-        // Check all possible years
-        let found = false;
-        for (let y = Number(fromYYYY); y <= Number(toYYYY)+1; y++) {
-          const checkDate = new Date(y, Number(month)-1, 15);
-          if (checkDate >= startDate && checkDate <= endDate) { found=true; break; }
-        }
-        if (!found) return false;
+      const startDate = new Date(from.slice(0,4), +from.slice(5,7)-1, 1);
+      const endDate   = new Date(to.slice(0,4),   +to.slice(5,7)-1,   28);
+      let found = false;
+      for (let y = startDate.getFullYear(); y <= endDate.getFullYear()+1; y++) {
+        const check = new Date(y, +month-1, 15);
+        if (check >= startDate && check <= endDate) { found=true; break; }
       }
+      if (!found) return false;
     }
     if (search) {
-      const name = (r.name || '').toLowerCase();
-      if (!name.includes(search)) return false;
+      if (!(r.name||'').toLowerCase().includes(search)) return false;
     }
     return true;
   });
@@ -472,11 +500,10 @@ async function doDelete() {
   document.getElementById('del-confirm-btn').disabled=false; document.getElementById('del-confirm-btn').innerText='🗑️ ยืนยันลบ';
 }
 function clearFilters() {
-  document.getElementById('f-dept').value='';
-  document.getElementById('f-month').value='';
-  document.getElementById('f-search').value='';
-  if (dataLoaded) applyFilters();
-  else document.getElementById('tbody').innerHTML='<div class="empty-state"><div class="ei">🗂️</div><p>เลือกแผนกและเดือน แล้วกด <strong>แสดง</strong></p></div>';
+  document.getElementById('f-dept').value  = '';
+  document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
+  document.getElementById('f-search').value = '';
+  showPrompt();
 }
 function openReport() {
   window.location.href = 'leave-report.html';
