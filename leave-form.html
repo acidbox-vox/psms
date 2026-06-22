@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>บันทึกการจำหน่าย</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<script src="js/api-config.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/cache.js"></script>
+<script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
+<style>
+:root {
+  --bg: #f4f6fb;
+  --bg2: #eef1f8;
+  --surface: #ffffff;
+  --surface-hover: #f8faff;
+  --border: #e2e8f0;
+  --border-hover: #c7d4e8;
+  --text: #1a2340;
+  --text2: #5a6a8a;
+  --text3: #9aaac0;
+  --blue: #3b7cf4;
+  --shadow: 0 2px 12px rgba(26,35,64,0.07);
+  --shadow-hover: 0 8px 28px rgba(26,35,64,0.12);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Sarabun', sans-serif;
+  min-height: 100vh; background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 16px 96px; position: relative; overflow-x: hidden;
+}
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(59,124,244,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 10;
+  background: linear-gradient(90deg, #3b7cf4, #7c3aed);
+}
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 22px 0 18px; width: 100%; max-width: 520px; position: relative; z-index: 1;
+}
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text2); font-size: 0.82em; font-weight: 600; cursor: pointer; transition: all .2s; text-decoration: none;
+  box-shadow: var(--shadow);
+}
+.back-btn:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface-hover); box-shadow: var(--shadow-hover); }
+.page-title { font-size: 1em; font-weight: 700; color: var(--text); }
+.wrap { width: 100%; max-width: 520px; position: relative; z-index: 1; animation: fadeUp .4s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+
+/* Cards */
+.card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 18px; padding: 20px 18px; margin-bottom: 10px;
+  box-shadow: var(--shadow); position: relative; overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, rgba(59,124,244,0.3), transparent);
+}
+.card-lbl {
+  font-size: 0.7em; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.clbl-dot {
+  width: 24px; height: 24px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; font-size: 12px;
+  background: rgba(59,124,244,0.1); border: 1px solid rgba(59,124,244,0.18);
+}
+.fld {
+  display: block; font-size: 0.74em; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text3); margin-bottom: 6px;
+}
+
+/* Mode toggle */
+.mode-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+.mode-btn {
+  flex: 1; padding: 9px 10px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--bg); color: var(--text2);
+  font-family: 'Sarabun', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .22s; text-align: center;
+}
+.mode-btn:hover { border-color: var(--border-hover); color: var(--text); background: var(--surface-hover); }
+.mode-btn.active { background: rgba(59,124,244,0.08); border-color: rgba(59,124,244,0.4); color: var(--blue); }
+
+/* Selects & inputs */
+.sel-wrap { position: relative; margin-bottom: 14px; }
+.sel-wrap::after { content: '▾'; position: absolute; right: 13px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; font-size: 12px; }
+.sel-wrap.last { margin-bottom: 0; }
+
+select, input[type="date"] {
+  width: 100%; padding: 11px 14px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 14px;
+  font-family: 'Sarabun', sans-serif; outline: none; transition: all .22s;
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+}
+select option { background: #fff; color: var(--text); }
+select:focus, input[type="date"]:focus {
+  border-color: rgba(59,124,244,0.6); background: #fff;
+  box-shadow: 0 0 0 3px rgba(59,124,244,0.10);
+}
+select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Name list */
+.name-list-wrap {
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 10px; max-height: 200px; overflow-y: auto; margin-bottom: 14px;
+}
+.name-list-wrap::-webkit-scrollbar { width: 4px; }
+.name-list-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.name-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; cursor: pointer; transition: background .15s;
+  border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2);
+}
+.name-item:last-child { border-bottom: none; }
+.name-item:hover { background: rgba(59,124,244,0.05); color: var(--text); }
+.name-item.selected { background: rgba(59,124,244,0.08); color: var(--blue); }
+.name-item .chk {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border);
+  background: transparent; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; flex-shrink: 0; transition: all .15s;
+}
+.name-item.selected .chk { background: var(--blue); border-color: var(--blue); color: #fff; }
+.name-list-empty { padding: 14px 12px; font-size: 13px; color: var(--text3); }
+
+/* Tags */
+.selected-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px; }
+.sel-tag {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+  border-radius: 20px; background: rgba(59,124,244,0.1); border: 1px solid rgba(59,124,244,0.25);
+  color: var(--blue); font-size: 12px; font-weight: 600;
+}
+.sel-tag .rm { cursor: pointer; color: rgba(59,124,244,0.5); font-size: 14px; line-height: 1; transition: color .15s; }
+.sel-tag .rm:hover { color: #ef4444; }
+.tags-label { font-size: 0.7em; color: var(--text3); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding-top: 4px; }
+
+/* Type buttons */
+.type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+.type-btn {
+  padding: 10px 4px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--bg); color: var(--text2);
+  font-family: 'Sarabun', sans-serif; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .22s; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.type-btn .ti { font-size: 18px; }
+.type-btn:hover { border-color: var(--border-hover); color: var(--text); background: var(--surface-hover); }
+.t-ลา .ti        { color: #ef4444; }
+.t-ศึกษา .ti     { color: #7c3aed; }
+.t-ราชการ .ti    { color: var(--blue); }
+.t-ล่วงเวลา .ti  { color: #059669; }
+.t-อื่นๆ .ti     { color: #d97706; }
+    .t-เวร .ti       { color: #0891b2; }
+.sel-ลา        { background: rgba(239,68,68,0.08);   border-color: rgba(239,68,68,0.4);   color: #dc2626; }
+.sel-ศึกษา     { background: rgba(124,58,237,0.08);  border-color: rgba(124,58,237,0.4);  color: #7c3aed; }
+.sel-ราชการ    { background: rgba(59,124,244,0.08);  border-color: rgba(59,124,244,0.4);  color: var(--blue); }
+.sel-ล่วงเวลา  { background: rgba(5,150,105,0.08);   border-color: rgba(5,150,105,0.4);   color: #059669; }
+.sel-อื่นๆ     { background: rgba(217,119,6,0.08);   border-color: rgba(217,119,6,0.4);   color: #d97706; }
+.sel-เวร       { background: rgba(8,145,178,0.08);   border-color: rgba(8,145,178,0.4);   color: #0891b2; }
+
+.date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.date-row > div > span { display: block; margin-bottom: 6px; }
+
+/* Preview & status */
+#preview {
+  display: none; background: rgba(59,124,244,0.07);
+  border: 1.5px solid rgba(59,124,244,0.2); border-radius: 12px;
+  padding: 13px 16px; margin-bottom: 10px;
+  font-size: 0.87em; line-height: 1.9; color: var(--blue);
+}
+#preview.show { display: block; }
+#preview strong { color: #1d4ed8; }
+
+#check-status {
+  display: none; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: 10px; margin-bottom: 10px;
+  font-size: 0.83em; font-weight: 600;
+  background: rgba(245,158,11,0.08); border: 1.5px solid rgba(245,158,11,0.25); color: #b45309;
+}
+#check-status.show { display: flex; }
+#check-status.ok  { background: rgba(5,150,105,0.07); border-color: rgba(5,150,105,0.25); color: #065f46; }
+#check-status.err { background: rgba(239,68,68,0.07); border-color: rgba(239,68,68,0.25); color: #b91c1c; }
+
+#multi-progress {
+  display: none; background: rgba(59,124,244,0.06);
+  border: 1.5px solid rgba(59,124,244,0.2); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 10px; font-size: 0.85em; color: var(--blue);
+}
+#multi-progress.show { display: block; }
+.prog-item { padding: 3px 0; }
+.prog-item.ok { color: #059669; }
+.prog-item.err { color: #dc2626; }
+
+/* Buttons */
+.btn-primary {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, #3b7cf4, #5b21b6);
+  color: #fff; border: none; border-radius: 12px;
+  font-size: 15px; font-weight: 700; font-family: 'Sarabun', sans-serif;
+  cursor: pointer; transition: all .25s;
+  box-shadow: 0 4px 20px rgba(59,124,244,0.3);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(59,124,244,0.4);
+}
+.btn-primary:disabled { background: var(--bg2); color: var(--text3); box-shadow: none; cursor: not-allowed; }
+
+.btn-ghost {
+  width: 100%; padding: 13px; margin-top: 10px;
+  background: var(--surface); border: 1.5px solid var(--border); color: var(--text2);
+  border-radius: 12px; font-size: 14px; font-family: 'Sarabun', sans-serif; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: var(--shadow);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface-hover); }
+
+/* Modal */
+.modal-ov {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(26,35,64,0.5); backdrop-filter: blur(6px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+.modal-ov.show { display: flex; }
+.modal-box {
+  background: #fff; border: 1.5px solid #fecaca;
+  border-radius: 20px; padding: 30px 24px; max-width: 380px; width: 100%;
+  animation: fadeUp .25s ease; text-align: center;
+  box-shadow: 0 20px 60px rgba(26,35,64,0.15);
+}
+.modal-box .mi { font-size: 38px; margin-bottom: 10px; }
+.modal-box h3  { font-size: 1.05em; font-weight: 800; color: #dc2626; margin-bottom: 8px; }
+.modal-box p   { font-size: 0.86em; color: var(--text2); line-height: 1.8; margin-bottom: 20px; white-space: pre-line; text-align: left; }
+.modal-ok {
+  width: 100%; padding: 12px; border-radius: 10px;
+  background: rgba(239,68,68,0.1); border: 1.5px solid rgba(239,68,68,0.35);
+  color: #dc2626; font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .2s;
+}
+.modal-ok:hover { background: rgba(239,68,68,0.18); }
+
+/* Toast */
+#toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(30px);
+  background: #fff; border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 12px 22px; font-size: 14px; font-weight: 600;
+  opacity: 0; transition: all .35s; z-index: 999; white-space: nowrap; max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(26,35,64,0.15);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.success { border-color: rgba(5,150,105,0.4); color: #065f46; background: rgba(5,150,105,0.06); }
+#toast.error   { border-color: rgba(239,68,68,0.4); color: #b91c1c; background: rgba(239,68,68,0.06); }
+
+.spinner { width: 13px; height: 13px; border: 2px solid rgba(59,124,244,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════
+   DARK MODE  (toggle via #dm-btn)
+═══════════════════════════════ */
+html, body { transition: background-color .35s ease, color .35s ease; }
+*, *::before, *::after { transition: background-color .35s ease, border-color .35s ease, color .35s ease, box-shadow .35s ease, opacity .35s ease; }
+
+html.dark {
+  --bg: #0f1117;
+  --bg2: #161b27;
+  --surface: #1c2133;
+  --surface-hover: #232a40;
+  --border: #2a3352;
+  --border-hover: #3a4a6e;
+  --text: #e8edf8;
+  --text2: #8a9abf;
+  --text3: #4a5a7a;
+  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  --shadow-hover: 0 8px 32px rgba(0,0,0,0.55);
+  --blue-light: rgba(59,124,244,0.15);
+  --green-light: rgba(16,185,129,0.12);
+  --purple-light: rgba(124,58,237,0.15);
+  --teal-light: rgba(13,148,136,0.12);
+}
+html.dark select, html.dark select option { background: var(--surface); color: var(--text); }
+html.dark input[type="date"] { background: var(--surface); color: var(--text); color-scheme: dark; }
+html.dark #toast { background: var(--surface) !important; }
+html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !important; }
+
+/* ─── Float toggle button ─── */
+#dm-btn {
+  position: fixed; top: 14px; right: 18px; z-index: 9999;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--surface); border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-hover); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; line-height: 1;
+  transition: transform .2s ease, background-color .35s ease, border-color .35s ease, box-shadow .35s ease;
+  user-select: none;
+}
+#dm-btn:hover { transform: scale(1.13) rotate(18deg); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="back-btn">← กลับ</a>
+  <span class="page-title">📝 บันทึกการจำหน่าย</span>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <div class="card-lbl"><span class="clbl-dot">👥</span>ข้อมูลกำลังพล</div>
+    <span class="fld">รูปแบบการเลือก</span>
+    <div class="mode-toggle" style="margin-bottom:16px">
+      <button class="mode-btn active" id="mode-single" onclick="setMode('single')">👤 เลือกทีละคน</button>
+      <button class="mode-btn" id="mode-multi"  onclick="setMode('multi')">👥 เลือกทีละหลายคน</button>
+    </div>
+    <span class="fld">แผนก</span>
+    <div class="sel-wrap">
+      <select id="f-dept" onchange="onDeptChange()">
+        <option value="">— กำลังโหลด... —</option>
+      </select>
+    </div>
+    <div id="single-wrap">
+      <span class="fld">ชื่อ - นามสกุล</span>
+      <div class="sel-wrap last">
+        <select id="f-name" disabled onchange="onFieldChange()">
+          <option value="">— เลือกแผนกก่อน —</option>
+        </select>
+      </div>
+    </div>
+    <div id="multi-wrap" style="display:none">
+      <span class="fld">เลือกรายชื่อ (เลือกได้หลายคน)</span>
+      <div class="name-list-wrap" id="name-list">
+        <div class="name-list-empty">— เลือกแผนกก่อน —</div>
+      </div>
+      <div id="tags-section" style="display:none">
+        <div class="tags-label">รายชื่อที่เลือกแล้ว</div>
+        <div class="selected-tags" id="selected-tags"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-lbl"><span class="clbl-dot">🗂️</span>ประเภทการจำหน่าย</div>
+    <div class="type-grid">
+      <button class="type-btn t-ลา"        id="tb-ลา"        onclick="selType('ลา')">       <span class="ti">🏖️</span>ลา</button>
+      <button class="type-btn t-ศึกษา"     id="tb-ศึกษา"     onclick="selType('ศึกษา')">    <span class="ti">🎓</span>ศึกษา/ดูงาน</button>
+      <button class="type-btn t-ราชการ"    id="tb-ราชการ"    onclick="selType('ราชการ')">   <span class="ti">🏛️</span>ราชการ</button>
+      <button class="type-btn t-ล่วงเวลา"  id="tb-ล่วงเวลา"  onclick="selType('ล่วงเวลา')"> <span class="ti">⏰</span>ล่วงเวลา</button>
+      <button class="type-btn t-เวร"       id="tb-เวร"       onclick="selType('เวร')">      <span class="ti">🌙</span>เวร</button>
+      <button class="type-btn t-อื่นๆ"     id="tb-อื่นๆ"     onclick="selType('อื่นๆ')">    <span class="ti">📌</span>อื่นๆ</button>
+    </div>
+    <input type="hidden" id="f-type" value="">
+  </div>
+
+  <div class="card">
+    <div class="card-lbl"><span class="clbl-dot">📅</span>ช่วงวันที่</div>
+    <div class="date-row">
+      <div>
+        <span class="fld">วันที่ไป</span>
+        <input type="date" id="f-from" onchange="onFieldChange()">
+      </div>
+      <div>
+        <span class="fld">วันที่กลับ</span>
+        <input type="date" id="f-to" onchange="onFieldChange()">
+      </div>
+    </div>
+  </div>
+
+  <div id="check-status"></div>
+  <div id="preview"></div>
+  <div id="multi-progress"></div>
+
+  <button class="btn-primary" id="btn-save" onclick="doSave()" disabled>💾 บันทึกข้อมูล</button>
+  <button class="btn-ghost" onclick="resetForm()">🔄 ล้างข้อมูล</button>
+
+</div>
+
+<div class="modal-ov" id="modal">
+  <div class="modal-box">
+    <div class="mi">🚫</div>
+    <h3>บันทึกไม่สำเร็จ — มีวันที่ซ้ำ</h3>
+    <p id="modal-msg"></p>
+    <button class="modal-ok" onclick="closeModal()">รับทราบ</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
+let deptMap = {}, allLeaves = [], checkTimer = null, currentMode = 'single', selectedNames = [];
+const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌' };
+const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ'];
+function thDate(s) { if (!s) return '-'; const [y,m,d] = s.split('-'); if (!y||!m||!d) return s; return `${+d} ${TH_M[+m]} ${+y+543}`; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+(function(){ const t = new Date().toISOString().split('T')[0]; document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();
+window.onload = initLoad;
+async function initLoad() {
+  if (!API) { showToast('❌ ยังไม่ตั้งค่า API URL', 'error'); return; }
+  try {
+    if (window.DataCache) {
+      [deptMap, allLeaves] = await Promise.all([DataCache.getDepts(), DataCache.getLeaves()]);
+    } else {
+      const [deptRes, leavesRes] = await Promise.all([fetch(API+'?action=getDepts'), fetch(API+'?action=getLeaves')]);
+      deptMap = await deptRes.json(); allLeaves = await leavesRes.json() || [];
+    }
+  } catch(e) { showToast('❌ โหลดข้อมูลไม่ได้: '+e.message,'error'); allLeaves = []; }
+  const sel = document.getElementById('f-dept');
+  if (Object.keys(deptMap).length === 0) { sel.innerHTML = '<option value="">— โหลดไม่สำเร็จ —</option>'; return; }
+  sel.innerHTML = '<option value="">— เลือกแผนก —</option>';
+  Object.keys(deptMap).forEach(d => { sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`; });
+}
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-single').className = 'mode-btn'+(mode==='single'?' active':'');
+  document.getElementById('mode-multi').className  = 'mode-btn'+(mode==='multi'?' active':'');
+  document.getElementById('single-wrap').style.display = mode==='single'?'':'none';
+  document.getElementById('multi-wrap').style.display  = mode==='multi'?'':'none';
+  selectedNames = []; document.getElementById('f-name').value = ''; renderSelectedTags();
+  const dept = document.getElementById('f-dept').value;
+  if (dept && mode==='multi') buildNameList(deptMap[dept]||[]);
+  onFieldChange();
+}
+function onDeptChange() {
+  const dept = document.getElementById('f-dept').value; selectedNames = [];
+  if (currentMode==='single') {
+    const ns = document.getElementById('f-name');
+    if (!dept) { ns.disabled=true; ns.innerHTML='<option value="">— เลือกแผนกก่อน —</option>'; }
+    else { ns.disabled=false; const names=deptMap[dept]||[]; let html='<option value="">— เลือกชื่อ —</option>'; names.forEach(n=>{html+=`<option value="${esc(n)}">${esc(n)}</option>`;}); ns.innerHTML=html; }
+  } else {
+    if (!dept) document.getElementById('name-list').innerHTML='<div class="name-list-empty">— เลือกแผนกก่อน —</div>';
+    else buildNameList(deptMap[dept]||[]);
+    renderSelectedTags();
+  }
+  onFieldChange();
+}
+function buildNameList(names) {
+  const wrap = document.getElementById('name-list');
+  if (!names.length) { wrap.innerHTML='<div class="name-list-empty">— ไม่มีรายชื่อในแผนกนี้ —</div>'; return; }
+  wrap.innerHTML = names.map(n=>`<div class="name-item${selectedNames.includes(n)?' selected':''}" onclick="toggleName('${esc(n)}')"><div class="chk">${selectedNames.includes(n)?'✓':''}</div><span>${esc(n)}</span></div>`).join('');
+}
+function toggleName(name) {
+  const idx = selectedNames.indexOf(name);
+  if (idx===-1) selectedNames.push(name); else selectedNames.splice(idx,1);
+  const dept = document.getElementById('f-dept').value; buildNameList(deptMap[dept]||[]); renderSelectedTags(); onFieldChange();
+}
+function renderSelectedTags() {
+  const sec=document.getElementById('tags-section'), wrap=document.getElementById('selected-tags');
+  if (!selectedNames.length) { sec.style.display='none'; wrap.innerHTML=''; return; }
+  sec.style.display='';
+  wrap.innerHTML = selectedNames.map(n=>`<span class="sel-tag">${esc(n)}<span class="rm" onclick="toggleName('${esc(n)}')">×</span></span>`).join('');
+}
+function selType(t) {
+  document.getElementById('f-type').value = t;
+  TYPES.forEach(x=>{ const b=document.getElementById('tb-'+x); b.className=`type-btn t-${x}`+(x===t?` sel-${x}`:''); });
+  onFieldChange();
+}
+function onFieldChange() {
+  clearTimeout(checkTimer); updatePreviewBasic();
+  const type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
+  if (currentMode==='single') {
+    const name=document.getElementById('f-name').value;
+    if (name&&from&&to&&type) checkTimer=setTimeout(()=>checkDuplicate(name,from,to),300);
+    else setCheckStatus('','');
+  } else {
+    const ready=selectedNames.length>0&&from&&to&&type;
+    document.getElementById('btn-save').disabled=!ready;
+    if (!ready) setCheckStatus('',''); else setCheckStatus('ok',`✅ พร้อมบันทึก ${selectedNames.length} คน`);
+  }
+}
+function checkDuplicate(name,newFrom,newTo) {
+  const conflicts=allLeaves.filter(r=>{ if(r.name!==name) return false; if(!r.dateFrom||!r.dateTo) return false; return newFrom<=r.dateTo&&newTo>=r.dateFrom; });
+  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${c.leaveType}: ${range}`; }).join('\n'); setCheckStatus('err',`⚠️ วันที่ซ้ำกับรายการที่มีอยู่:\n${detail}`); document.getElementById('btn-save').disabled=true; }
+  else { setCheckStatus('ok','✅ วันที่ว่าง สามารถบันทึกได้'); const type=document.getElementById('f-type').value; document.getElementById('btn-save').disabled=!type; }
+}
+function setCheckStatus(type,msg) {
+  const el=document.getElementById('check-status');
+  if (!msg) { el.className=''; el.innerHTML=''; return; }
+  el.className='show '+(type||''); el.innerHTML=msg.replace(/\n/g,'<br>');
+}
+function updatePreviewBasic() {
+  const type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, dept=document.getElementById('f-dept').value, box=document.getElementById('preview');
+  if (currentMode==='single') {
+    const name=document.getElementById('f-name').value, ok=name&&type&&from&&to;
+    if (!ok) { document.getElementById('btn-save').disabled=true; box.className=''; return; }
+    const dlbl=from===to?thDate(from):`${thDate(from)} → ${thDate(to)}`;
+    box.innerHTML=`<strong>${TYPE_ICON[type]||''} ${esc(type)}</strong><br>👤 ${esc(name)} <span style="color:var(--text3)">· ${esc(dept)}</span><br>📅 ${dlbl}`;
+    box.className='show';
+  } else { box.className=''; }
+}
+async function doSave() { if (currentMode==='single') await doSaveSingle(); else await doSaveMulti(); }
+async function doSaveSingle() {
+  const name=document.getElementById('f-name').value, dept=document.getElementById('f-dept').value, type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
+  const conflicts=allLeaves.filter(r=>{ if(r.name!==name) return false; if(!r.dateFrom||!r.dateTo) return false; return from<=r.dateTo&&to>=r.dateFrom; });
+  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${c.leaveType}: ${range}`; }).join('\n'); document.getElementById('modal-msg').innerText=`${name} มีรายการที่วันที่ซ้ำกันอยู่แล้ว:\n${detail}`; document.getElementById('modal').classList.add('show'); return; }
+  const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML='⏳ กำลังบันทึก...';
+  try {
+    const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'saveLeave',dept,name,leaveType:type,dateFrom:from,dateTo:to})});
+    const data=await r.json();
+    if (data.duplicate) { document.getElementById('modal-msg').innerText=data.message; document.getElementById('modal').classList.add('show'); }
+    else if (data.success) { allLeaves.push({name,dept,leaveType:type,dateFrom:from,dateTo:to}); if(window.DataCache)DataCache.invalidate(); showToast('✅ บันทึกสำเร็จ','success'); resetForm(true); }
+    else { showToast('❌ '+(data.message||'บันทึกไม่สำเร็จ'),'error'); }
+  } catch(e) { showToast('❌ เชื่อมต่อไม่ได้: '+e.message,'error'); }
+  btn.disabled=false; btn.innerHTML='💾 บันทึกข้อมูล';
+}
+async function doSaveMulti() {
+  const dept=document.getElementById('f-dept').value, type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, names=[...selectedNames];
+  const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML=`⏳ กำลังบันทึก 0/${names.length}...`;
+  const prog=document.getElementById('multi-progress'); prog.innerHTML=`<b>กำลังบันทึก ${names.length} คน...</b><br>`; prog.className='show';
+  let okCount=0;
+  for (let i=0;i<names.length;i++) {
+    const name=names[i]; btn.innerHTML=`⏳ กำลังบันทึก ${i+1}/${names.length}...`;
+    const dup=allLeaves.filter(r=>r.name===name&&r.dateFrom&&r.dateTo&&from<=r.dateTo&&to>=r.dateFrom);
+    if (dup.length>0) { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — วันที่ซ้ำ</div>`; continue; }
+    try {
+      const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'saveLeave',dept,name,leaveType:type,dateFrom:from,dateTo:to})});
+      const data=await r.json();
+      if (data.success) { allLeaves.push({name,dept,leaveType:type,dateFrom:from,dateTo:to}); prog.innerHTML+=`<div class="prog-item ok">✅ ${esc(name)}</div>`; okCount++; }
+      else if (data.duplicate) { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(data.message||'ซ้ำ')}</div>`; }
+      else { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(data.message||'ไม่สำเร็จ')}</div>`; }
+    } catch(e) { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(e.message)}</div>`; }
+  }
+  prog.innerHTML+=`<br><b>เสร็จสิ้น: บันทึกสำเร็จ ${okCount}/${names.length} คน</b>`;
+  showToast(`✅ บันทึกสำเร็จ ${okCount}/${names.length} คน`,'success');
+  btn.disabled=false; btn.innerHTML='💾 บันทึกข้อมูล';
+  selectedNames=[]; renderSelectedTags();
+  const deptVal=document.getElementById('f-dept').value; buildNameList(deptMap[deptVal]||[]); onFieldChange();
+}
+function resetForm(keepDept) {
+  selectedNames=[];
+  if (!keepDept) { document.getElementById('f-dept').value=''; document.getElementById('f-name').innerHTML='<option value="">— เลือกแผนกก่อน —</option>'; document.getElementById('f-name').disabled=true; document.getElementById('name-list').innerHTML='<div class="name-list-empty">— เลือกแผนกก่อน —</div>'; }
+  else { document.getElementById('f-name').value=''; const dept=document.getElementById('f-dept').value; if (dept&&currentMode==='multi') buildNameList(deptMap[dept]||[]); }
+  renderSelectedTags();
+  document.getElementById('f-type').value='';
+  TYPES.forEach(x=>document.getElementById('tb-'+x).className=`type-btn t-${x}`);
+  const t=new Date().toISOString().split('T')[0]; document.getElementById('f-from').value=t; document.getElementById('f-to').value=t;
+  document.getElementById('preview').className=''; document.getElementById('check-status').className=''; document.getElementById('check-status').innerHTML='';
+  document.getElementById('multi-progress').className=''; document.getElementById('btn-save').disabled=true;
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+function showToast(msg,type) { const t=document.getElementById('toast'); t.innerText=msg; t.className='show '+(type||''); if(type==='success'){if(window.playSaveSuccess)playSaveSuccess();} else if(type==='error'){if(window.playSaveFail)playSaveFail();} setTimeout(()=>t.className='',3500); }
+</script>
+
+<button id="dm-btn" title="สลับ Dark/Light Mode" aria-label="Toggle dark mode">🌙</button>
+<script>
+(function(){
+  var html = document.documentElement;
+  var btn  = document.getElementById('dm-btn');
+  function applyTheme(dark){
+    if(dark){ html.classList.add('dark'); btn.textContent='☀️'; }
+    else     { html.classList.remove('dark'); btn.textContent='🌙'; }
+  }
+  var saved = localStorage.getItem('theme');
+  applyTheme(saved === 'dark');
+  btn.addEventListener('click', function(){
+    var isDark = html.classList.contains('dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    applyTheme(!isDark);
+  });
+})();
+</script>
+</body>
+</html>

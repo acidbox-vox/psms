@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ปฏิทินการจำหน่าย</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<script src="js/api-config.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/cache.js"></script>
+<script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
+<style>
+:root {
+  --bg: #f4f6fb;
+  --bg2: #eef1f8;
+  --surface: #ffffff;
+  --surface-hover: #f8faff;
+  --border: #e2e8f0;
+  --border-hover: #c7d4e8;
+  --text: #1a2340;
+  --text2: #5a6a8a;
+  --text3: #9aaac0;
+  --blue: #3b7cf4;
+  --shadow: 0 2px 12px rgba(26,35,64,0.07);
+  --shadow-hover: 0 8px 28px rgba(26,35,64,0.12);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Sarabun', sans-serif;
+  min-height: 100vh; background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 16px 96px; position: relative; overflow-x: hidden;
+}
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(59,124,244,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 10;
+  background: linear-gradient(90deg, #7c3aed, #3b7cf4);
+}
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 22px 0 18px; width: 100%; max-width: 720px; position: relative; z-index: 1;
+}
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text2); font-size: 0.82em; font-weight: 600; cursor: pointer; transition: all .2s; text-decoration: none; box-shadow: var(--shadow);
+}
+.back-btn:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface-hover); box-shadow: var(--shadow-hover); }
+.page-title { font-size: 1em; font-weight: 700; color: var(--text); }
+.wrap { width: 100%; max-width: 720px; position: relative; z-index: 1; animation: fadeUp .4s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+
+/* Filter */
+.filter-bar {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 10px 14px; margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  box-shadow: var(--shadow);
+}
+.filter-lbl { font-size: 0.68em; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text3); white-space: nowrap; }
+.sel-wrap-f { position: relative; flex: 1; min-width: 150px; }
+.sel-wrap-f::after { content: '▾'; position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; font-size: 12px; }
+.sel-wrap-f select {
+  width: 100%; padding: 8px 12px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 9px; color: var(--text); font-size: 13px; font-family: 'Sarabun', sans-serif;
+  outline: none; transition: all .2s; appearance: none; -webkit-appearance: none; cursor: pointer;
+}
+.sel-wrap-f select option { background: #fff; }
+.sel-wrap-f select:focus { border-color: rgba(124,58,237,0.5); background: #fff; box-shadow: 0 0 0 3px rgba(124,58,237,0.08); }
+
+/* Month nav */
+.month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 12px 18px; margin-bottom: 10px; box-shadow: var(--shadow);
+}
+.month-title { font-size: 1.05em; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
+.nav-btn {
+  padding: 7px 16px; border-radius: 9px; border: 1.5px solid var(--border);
+  background: var(--bg); color: var(--text2); font-family: 'Sarabun', sans-serif;
+  font-size: 13px; font-weight: 700; cursor: pointer; transition: all .2s;
+}
+.nav-btn:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface-hover); }
+
+/* Day of week */
+.dow-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.dow-cell { text-align: center; font-size: 0.68em; font-weight: 700; letter-spacing: .06em; color: var(--text3); padding: 5px 0; }
+.dow-cell:first-child { color: #dc2626; }
+.dow-cell:last-child  { color: var(--blue); }
+
+/* Calendar grid */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 10px; }
+.day-cell {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 11px; padding: 7px 6px; min-height: 70px;
+  cursor: pointer; transition: all .18s; position: relative; overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.day-cell:hover { background: var(--surface-hover); border-color: var(--border-hover); transform: translateY(-1px); box-shadow: var(--shadow-hover); }
+.day-cell.today { border-color: rgba(124,58,237,0.5); box-shadow: 0 0 0 2px rgba(124,58,237,0.12), var(--shadow); }
+.day-cell.empty { background: transparent; border-color: transparent; cursor: default; box-shadow: none; transform: none; }
+.day-cell.sunday   .day-num { color: #dc2626; }
+.day-cell.saturday .day-num { color: var(--blue); }
+.day-cell.today    .day-num { color: #7c3aed; font-weight: 800; }
+.day-num { font-size: 0.8em; font-weight: 600; color: var(--text2); margin-bottom: 4px; }
+.dot-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; }
+.dot-ลา        { background: #ef4444; }
+.dot-ศึกษา     { background: #7c3aed; }
+.dot-ราชการ    { background: var(--blue); }
+.dot-ล่วงเวลา  { background: #059669; }
+.dot-อื่นๆ     { background: #d97706; }
+.dot-เวร       { background: #0891b2; }
+.busy-count {
+  position: absolute; top: 5px; right: 6px;
+  font-size: 0.64em; font-weight: 800;
+  background: rgba(124,58,237,0.1); color: #7c3aed;
+  border-radius: 10px; padding: 1px 5px; border: 1px solid rgba(124,58,237,0.2);
+}
+
+/* Detail panel */
+.detail-panel {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px;
+  padding: 16px; min-height: 60px; box-shadow: var(--shadow); position: relative;
+}
+.detail-date { font-size: 0.72em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
+.detail-empty { color: var(--text3); font-size: 0.86em; }
+.detail-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.detail-name { font-size: 0.9em; font-weight: 600; color: var(--text); flex: 1; }
+.detail-dept { font-size: 0.74em; color: var(--text3); }
+.detail-type { font-size: 0.74em; font-weight: 700; padding: 2px 9px; border-radius: 10px; white-space: nowrap; }
+.dt-ลา        { background: rgba(239,68,68,0.08);   color: #dc2626; }
+.dt-ศึกษา     { background: rgba(124,58,237,0.08);  color: #7c3aed; }
+.dt-ราชการ    { background: rgba(59,124,244,0.08);  color: var(--blue); }
+.dt-ล่วงเวลา  { background: rgba(5,150,105,0.08);   color: #059669; }
+.dt-อื่นๆ     { background: rgba(217,119,6,0.08);   color: #d97706; }
+.dt-เวร       { background: rgba(8,145,178,0.08);   color: #0891b2; }
+
+.loading-row { text-align: center; padding: 44px; color: var(--text3); font-size: .9em; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.spinner { width: 15px; height: 15px; border: 2px solid rgba(59,124,244,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════
+   DARK MODE  (toggle via #dm-btn)
+═══════════════════════════════ */
+html, body { transition: background-color .35s ease, color .35s ease; }
+*, *::before, *::after { transition: background-color .35s ease, border-color .35s ease, color .35s ease, box-shadow .35s ease, opacity .35s ease; }
+
+html.dark {
+  --bg: #0f1117;
+  --bg2: #161b27;
+  --surface: #1c2133;
+  --surface-hover: #232a40;
+  --border: #2a3352;
+  --border-hover: #3a4a6e;
+  --text: #e8edf8;
+  --text2: #8a9abf;
+  --text3: #4a5a7a;
+  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  --shadow-hover: 0 8px 32px rgba(0,0,0,0.55);
+  --blue-light: rgba(59,124,244,0.15);
+  --green-light: rgba(16,185,129,0.12);
+  --purple-light: rgba(124,58,237,0.15);
+  --teal-light: rgba(13,148,136,0.12);
+}
+html.dark select, html.dark select option { background: var(--surface); color: var(--text); }
+html.dark input[type="date"] { background: var(--surface); color: var(--text); color-scheme: dark; }
+html.dark #toast { background: var(--surface) !important; }
+html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !important; }
+
+/* ─── Float toggle button ─── */
+#dm-btn {
+  position: fixed; top: 14px; right: 18px; z-index: 9999;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--surface); border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-hover); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; line-height: 1;
+  transition: transform .2s ease, background-color .35s ease, border-color .35s ease, box-shadow .35s ease;
+  user-select: none;
+}
+#dm-btn:hover { transform: scale(1.13) rotate(18deg); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="back-btn">← กลับ</a>
+  <span class="page-title">📅 ปฏิทินการจำหน่าย</span>
+</div>
+
+<div class="wrap">
+
+  <div class="filter-bar">
+    <span class="filter-lbl">🏢 แผนก</span>
+    <div class="sel-wrap-f">
+      <select id="f-dept" onchange="buildCalendar()">
+        <option value="">ทุกแผนก</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="month-nav">
+    <button class="nav-btn" onclick="changeMonth(-1)">‹ ก่อนหน้า</button>
+    <span class="month-title" id="month-title">—</span>
+    <button class="nav-btn" onclick="changeMonth(1)">ถัดไป ›</button>
+  </div>
+
+  <div class="dow-row">
+    <div class="dow-cell">อา</div><div class="dow-cell">จ</div><div class="dow-cell">อ</div>
+    <div class="dow-cell">พ</div><div class="dow-cell">พฤ</div><div class="dow-cell">ศ</div><div class="dow-cell">ส</div>
+  </div>
+
+  <div id="cal-grid" class="cal-grid">
+    <div class="loading-row" style="grid-column:1/-1"><span class="spinner"></span> กำลังโหลด...</div>
+  </div>
+
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-empty">คลิกที่วันใดวันหนึ่งเพื่อดูรายละเอียด</div>
+  </div>
+
+</div>
+
+<script>
+const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
+const TH_M_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const DOT_COLOR = { 'ลา':'dot-ลา','ศึกษา':'dot-ศึกษา','ราชการ':'dot-ราชการ','ล่วงเวลา':'dot-ล่วงเวลา','เวร':'dot-เวร','อื่นๆ':'dot-อื่นๆ' };
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌' };
+let leaves = [];
+let curYear, curMonth;
+const today = new Date(); curYear = today.getFullYear(); curMonth = today.getMonth();
+function pad(n) { return String(n).padStart(2,'0'); }
+function ymd(y,m,d) { return `${y}-${pad(m+1)}-${pad(d)}`; }
+async function loadData() {
+  if (!API) { document.getElementById('cal-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">ยังไม่ตั้งค่า API URL</div>'; return; }
+  try {
+    leaves = window.DataCache ? await DataCache.getLeaves() : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
+    const depts=[...new Set(leaves.map(l=>l.dept).filter(Boolean))].sort();
+    const sel=document.getElementById('f-dept');
+    sel.innerHTML='<option value="">ทุกแผนก</option>';
+    depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
+    buildCalendar();
+  } catch(e) { document.getElementById('cal-grid').innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">❌ โหลดไม่ได้: ${e.message}</div>`; }
+}
+function changeMonth(delta) {
+  curMonth+=delta;
+  if (curMonth>11) { curMonth=0; curYear++; }
+  if (curMonth<0)  { curMonth=11; curYear--; }
+  buildCalendar();
+  document.getElementById('detail-panel').innerHTML='<div class="detail-empty">คลิกที่วันใดวันหนึ่งเพื่อดูรายละเอียด</div>';
+}
+function buildCalendar() {
+  document.getElementById('month-title').innerText=`${TH_M_FULL[curMonth]} ${curYear+543}`;
+  const deptFilter=document.getElementById('f-dept').value;
+  const filteredLeaves=deptFilter?leaves.filter(l=>l.dept===deptFilter):leaves;
+  const grid=document.getElementById('cal-grid'); grid.innerHTML='';
+  const firstDay=new Date(curYear,curMonth,1).getDay();
+  const lastDate=new Date(curYear,curMonth+1,0).getDate();
+  const todayKey=ymd(today.getFullYear(),today.getMonth(),today.getDate());
+  for (let i=0;i<firstDay;i++) { const e=document.createElement('div'); e.className='day-cell empty'; grid.appendChild(e); }
+  for (let d=1;d<=lastDate;d++) {
+    const key=ymd(curYear,curMonth,d), dow=new Date(curYear,curMonth,d).getDay();
+    const found=filteredLeaves.filter(l=>l.dateFrom&&l.dateTo&&key>=l.dateFrom&&key<=l.dateTo);
+    const cell=document.createElement('div');
+    let cls='day-cell';
+    if (key===todayKey) cls+=' today';
+    if (dow===0) cls+=' sunday'; if (dow===6) cls+=' saturday';
+    cell.className=cls;
+    let inner=`<div class="day-num">${d}</div>`;
+    if (found.length>0) { inner+=`<div class="busy-count">${found.length}</div><div class="dot-row">`; found.forEach(l=>{inner+=`<div class="dot ${DOT_COLOR[l.leaveType]||''}"></div>`;}); inner+='</div>'; }
+    cell.innerHTML=inner; cell.onclick=()=>showDetail(key,found); grid.appendChild(cell);
+  }
+}
+function showDetail(dateKey,list) {
+  const panel=document.getElementById('detail-panel');
+  const parts=dateKey.split('-');
+  const dLabel=`${+parts[2]} ${TH_M_SHORT[+parts[1]]} ${+parts[0]+543}`;
+  if (list.length===0) { panel.innerHTML=`<div class="detail-date">📅 ${dLabel}</div><div class="detail-empty">ไม่มีรายการในวันนี้</div>`; return; }
+  let html=`<div class="detail-date">📅 ${dLabel} — ${list.length} คน</div>`;
+  list.forEach(l=>{ html+=`<div class="detail-row"><div class="detail-dot ${DOT_COLOR[l.leaveType]||''}"></div><div style="flex:1"><div class="detail-name">${esc(l.name)}</div><div class="detail-dept">${esc(l.dept||'-')}</div></div><div class="detail-type dt-${l.leaveType}">${TYPE_ICON[l.leaveType]||''} ${esc(l.leaveType)}</div></div>`; });
+  panel.innerHTML=html;
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+loadData();
+</script>
+
+<button id="dm-btn" title="สลับ Dark/Light Mode" aria-label="Toggle dark mode">🌙</button>
+<script>
+(function(){
+  var html = document.documentElement;
+  var btn  = document.getElementById('dm-btn');
+  function applyTheme(dark){
+    if(dark){ html.classList.add('dark'); btn.textContent='☀️'; }
+    else     { html.classList.remove('dark'); btn.textContent='🌙'; }
+  }
+  var saved = localStorage.getItem('theme');
+  applyTheme(saved === 'dark');
+  btn.addEventListener('click', function(){
+    var isDark = html.classList.contains('dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    applyTheme(!isDark);
+  });
+})();
+</script>
+</body>
+</html>

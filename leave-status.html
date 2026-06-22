@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สถานะจำหน่าย</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<script src="js/api-config.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/cache.js"></script>
+<script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
+<style>
+:root {
+  --bg: #f4f6fb;
+  --bg2: #eef1f8;
+  --surface: #ffffff;
+  --surface-hover: #f8faff;
+  --border: #e2e8f0;
+  --border-hover: #c7d4e8;
+  --text: #1a2340;
+  --text2: #5a6a8a;
+  --text3: #9aaac0;
+  --blue: #3b7cf4;
+  --shadow: 0 2px 12px rgba(26,35,64,0.07);
+  --shadow-hover: 0 8px 28px rgba(26,35,64,0.12);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Sarabun', sans-serif;
+  min-height: 100vh; background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 16px 96px; position: relative; overflow-x: hidden;
+}
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(59,124,244,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 10;
+  background: linear-gradient(90deg, #10b981, #3b7cf4);
+}
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 22px 0 18px; width: 100%; max-width: 720px; position: relative; z-index: 1;
+}
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text2); font-size: 0.82em; font-weight: 600; cursor: pointer; transition: all .2s; text-decoration: none; box-shadow: var(--shadow);
+}
+.back-btn:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface-hover); box-shadow: var(--shadow-hover); }
+.page-title { font-size: 1em; font-weight: 700; color: var(--text); }
+.wrap { width: 100%; max-width: 720px; position: relative; z-index: 1; animation: fadeUp .4s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+
+/* Stats */
+.stats-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 12px; }
+.stat-card {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 12px 8px; text-align: center; box-shadow: var(--shadow);
+  position: relative; overflow: hidden; transition: all .22s;
+}
+.stat-card:hover { background: var(--surface-hover); border-color: var(--border-hover); transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.sn { font-size: 1.4em; font-weight: 800; }
+.sl { font-size: 0.64em; color: var(--text3); margin-top: 3px; }
+.sc-la .sn     { color: #dc2626; }
+.sc-study .sn  { color: #7c3aed; }
+.sc-gov .sn    { color: var(--blue); }
+.sc-ot .sn     { color: #059669; }
+.sc-other .sn  { color: #d97706; }
+.sc-duty .sn   { color: #0891b2; }
+
+/* Filter bar */
+.filter-bar {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 12px 16px; margin-bottom: 12px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  box-shadow: var(--shadow);
+}
+.filter-lbl { font-size: 0.68em; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text3); white-space: nowrap; }
+.sel-wrap { position: relative; flex: 1; min-width: 130px; }
+.sel-wrap::after { content: '▾'; position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; font-size: 12px; }
+select, input[type="date"] {
+  width: 100%; padding: 9px 12px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 9px; color: var(--text); font-size: 13px; font-family: 'Sarabun', sans-serif;
+  outline: none; transition: all .2s; appearance: none; -webkit-appearance: none; cursor: pointer;
+}
+select option { background: #fff; }
+select:focus, input:focus { border-color: rgba(59,124,244,0.5); background: #fff; box-shadow: 0 0 0 3px rgba(59,124,244,0.08); }
+.btn-sm {
+  padding: 8px 14px; border-radius: 9px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text2); font-family: 'Sarabun', sans-serif;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.btn-sm:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface-hover); }
+.btn-search { background: var(--blue); color: #fff; border-color: var(--blue); }
+.btn-search:hover { background: #2563d0; border-color: #2563d0; color: #fff; }
+.search-wrap { min-width: 170px; }
+input[type="text"] {
+  width: 100%; padding: 9px 12px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 9px; color: var(--text); font-size: 13px; font-family: 'Sarabun', sans-serif;
+  outline: none; transition: all .2s;
+}
+input[type="text"]:focus { border-color: rgba(59,124,244,0.5); background: #fff; box-shadow: 0 0 0 3px rgba(59,124,244,0.08); }
+html.dark input[type="text"] { background: var(--surface); color: var(--text); }
+
+/* Table */
+.table-wrap {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px;
+  overflow: hidden; box-shadow: var(--shadow); position: relative;
+}
+.table-hdr {
+  padding: 13px 18px; border-bottom: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg);
+}
+.thr-title { font-size: 0.68em; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text3); }
+#t-count { font-size: 0.78em; color: var(--text3); }
+.tbl-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 520px; }
+thead th {
+  padding: 9px 14px; font-size: 0.68em; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--text3); text-align: left;
+  background: var(--bg); border-bottom: 1.5px solid var(--border);
+}
+tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(59,124,244,0.04); }
+tbody td { padding: 9px 14px; font-size: 0.86em; color: var(--text); vertical-align: middle; }
+
+.new-badge {
+  display: inline-block; padding: 1px 6px; border-radius: 4px; margin-left: 5px;
+  background: rgba(59,124,244,0.1); border: 1px solid rgba(59,124,244,0.25);
+  color: var(--blue); font-size: 0.7em; font-weight: 700; vertical-align: middle;
+}
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 9px; border-radius: 20px; font-size: 0.74em; font-weight: 700; white-space: nowrap;
+}
+.b-ลา        { background: rgba(239,68,68,0.08);   color: #dc2626; border: 1px solid rgba(239,68,68,0.2); }
+.b-ศึกษา     { background: rgba(124,58,237,0.08);  color: #7c3aed; border: 1px solid rgba(124,58,237,0.2); }
+.b-ราชการ    { background: rgba(59,124,244,0.08);  color: var(--blue); border: 1px solid rgba(59,124,244,0.2); }
+.b-ล่วงเวลา  { background: rgba(5,150,105,0.08);   color: #059669; border: 1px solid rgba(5,150,105,0.2); }
+.b-อื่นๆ     { background: rgba(217,119,6,0.08);   color: #d97706; border: 1px solid rgba(217,119,6,0.2); }
+.b-เวร       { background: rgba(8,145,178,0.08);   color: #0891b2; border: 1px solid rgba(8,145,178,0.2); }
+.dept-tag { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--bg2); font-size: 0.78em; color: var(--text2); border: 1px solid var(--border); }
+.days-pill { display: inline-block; padding: 2px 7px; border-radius: 5px; background: var(--bg); font-size: 0.78em; color: var(--text3); font-weight: 700; border: 1px solid var(--border); }
+.fw6 { font-weight: 600; }
+.nowrap { white-space: nowrap; }
+
+.del-btn {
+  padding: 5px 9px; border-radius: 8px; border: 1px solid rgba(239,68,68,0.2);
+  background: rgba(239,68,68,0.06); color: #dc2626; font-size: 13px; cursor: pointer; transition: all .2s; line-height: 1;
+}
+.del-btn:hover { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); }
+
+/* Delete modal */
+.del-modal-ov {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(26,35,64,0.45); backdrop-filter: blur(6px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+.del-modal-ov.show { display: flex; }
+.del-modal-box {
+  background: #fff; border: 1.5px solid #fecaca;
+  border-radius: 20px; padding: 30px 24px; max-width: 360px; width: 100%;
+  animation: fadeUp .25s ease; text-align: center;
+  box-shadow: 0 20px 60px rgba(26,35,64,0.15);
+}
+.del-modal-box .mi { font-size: 36px; margin-bottom: 10px; }
+.del-modal-box h3 { font-size: 1em; font-weight: 800; color: #dc2626; margin-bottom: 14px; }
+.del-info {
+  background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.15);
+  border-radius: 11px; padding: 12px 14px; margin-bottom: 20px; text-align: left;
+}
+.del-info-row { font-size: 0.85em; color: var(--text2); margin-bottom: 4px; line-height: 1.6; }
+.del-info-row:last-child { margin-bottom: 0; }
+.del-info-row strong { color: var(--text); }
+.del-btn-row { display: flex; gap: 10px; }
+.del-cancel {
+  flex: 1; padding: 12px; border-radius: 10px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  color: var(--text2); font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s;
+}
+.del-cancel:hover { color: var(--text); border-color: var(--border-hover); }
+#del-confirm-btn {
+  flex: 1; padding: 12px; border-radius: 10px;
+  background: rgba(239,68,68,0.1); border: 1.5px solid rgba(239,68,68,0.35);
+  color: #dc2626; font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .2s;
+}
+#del-confirm-btn:hover:not(:disabled) { background: rgba(239,68,68,0.2); }
+#del-confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.empty-state { text-align: center; padding: 52px 24px; color: var(--text3); }
+.empty-state .ei { font-size: 36px; margin-bottom: 10px; }
+.loading-row { text-align: center; padding: 44px; color: var(--text3); font-size: .9em; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.spinner { width: 15px; height: 15px; border: 2px solid rgba(59,124,244,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(30px);
+  background: #fff; border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 12px 22px; font-size: 14px; font-weight: 600;
+  opacity: 0; transition: all .35s; z-index: 999; white-space: nowrap; max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(26,35,64,0.15);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.success { border-color: rgba(5,150,105,0.4); color: #065f46; background: rgba(5,150,105,0.06); }
+#toast.error   { border-color: rgba(239,68,68,0.4); color: #b91c1c; background: rgba(239,68,68,0.06); }
+
+/* ═══════════════════════════════
+   DARK MODE  (toggle via #dm-btn)
+═══════════════════════════════ */
+html, body { transition: background-color .35s ease, color .35s ease; }
+*, *::before, *::after { transition: background-color .35s ease, border-color .35s ease, color .35s ease, box-shadow .35s ease, opacity .35s ease; }
+
+html.dark {
+  --bg: #0f1117;
+  --bg2: #161b27;
+  --surface: #1c2133;
+  --surface-hover: #232a40;
+  --border: #2a3352;
+  --border-hover: #3a4a6e;
+  --text: #e8edf8;
+  --text2: #8a9abf;
+  --text3: #4a5a7a;
+  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  --shadow-hover: 0 8px 32px rgba(0,0,0,0.55);
+  --blue-light: rgba(59,124,244,0.15);
+  --green-light: rgba(16,185,129,0.12);
+  --purple-light: rgba(124,58,237,0.15);
+  --teal-light: rgba(13,148,136,0.12);
+}
+html.dark select, html.dark select option { background: var(--surface); color: var(--text); }
+html.dark input[type="date"] { background: var(--surface); color: var(--text); color-scheme: dark; }
+html.dark #toast { background: var(--surface) !important; }
+html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !important; }
+
+/* ─── Float toggle button ─── */
+#dm-btn {
+  position: fixed; top: 14px; right: 18px; z-index: 9999;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--surface); border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-hover); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; line-height: 1;
+  transition: transform .2s ease, background-color .35s ease, border-color .35s ease, box-shadow .35s ease;
+  user-select: none;
+}
+#dm-btn:hover { transform: scale(1.13) rotate(18deg); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="back-btn">← กลับ</a>
+  <span class="page-title">📊 สถานะจำหน่าย</span>
+</div>
+
+<div class="wrap">
+
+  <div class="stats-row">
+    <div class="stat-card sc-la">   <div class="sn" id="s-ลา">—</div>     <div class="sl">ลา</div></div>
+    <div class="stat-card sc-study"><div class="sn" id="s-ศึกษา">—</div>  <div class="sl">ศึกษา</div></div>
+    <div class="stat-card sc-gov">  <div class="sn" id="s-ราชการ">—</div> <div class="sl">ราชการ</div></div>
+    <div class="stat-card sc-ot">   <div class="sn" id="s-ล่วงเวลา">—</div><div class="sl">ล่วงเวลา</div></div>
+    <div class="stat-card sc-duty"><div class="sn" id="s-เวร">—</div>   <div class="sl">เวร</div></div>
+    <div class="stat-card sc-other"><div class="sn" id="s-อื่นๆ">—</div>  <div class="sl">อื่นๆ</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-lbl">🔍 กรอง</span>
+    <div class="sel-wrap">
+      <select id="f-dept" onchange="onFilterChange()">
+        <option value="">ทุกแผนก</option>
+      </select>
+    </div>
+    <div class="sel-wrap">
+      <select id="f-month" onchange="onFilterChange()">
+        <option value="">ทุกเดือน</option>
+        <option value="01">มกราคม</option>
+        <option value="02">กุมภาพันธ์</option>
+        <option value="03">มีนาคม</option>
+        <option value="04">เมษายน</option>
+        <option value="05">พฤษภาคม</option>
+        <option value="06">มิถุนายน</option>
+        <option value="07">กรกฎาคม</option>
+        <option value="08">สิงหาคม</option>
+        <option value="09">กันยายน</option>
+        <option value="10">ตุลาคม</option>
+        <option value="11">พฤศจิกายน</option>
+        <option value="12">ธันวาคม</option>
+      </select>
+    </div>
+    <div class="sel-wrap search-wrap">
+      <input type="text" id="f-search" placeholder="🔍 ค้นหารายชื่อ..." oninput="applyFilters()" autocomplete="off">
+    </div>
+    <button class="btn-sm btn-search" onclick="applyFilters()">🔍 แสดง</button>
+    <button class="btn-sm" onclick="clearFilters()">✕ ล้าง</button>
+    <button class="btn-sm" onclick="loadData(true)">🔄 รีเฟรช</button>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-hdr">
+      <span class="thr-title">รายการจำหน่ายทั้งหมด</span>
+      <span id="t-count"></span>
+    </div>
+    <div class="tbl-scroll">
+      <div id="tbody"><div class="empty-state"><div class="ei">🗂️</div><p>เลือกแผนกและเดือน แล้วกด <strong>แสดง</strong></p></div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="del-modal-ov" id="del-modal">
+  <div class="del-modal-box">
+    <div class="mi">🗑️</div>
+    <h3>ยืนยันการลบรายการ?</h3>
+    <div class="del-info">
+      <div class="del-info-row">👤 ชื่อ: <strong id="del-name">—</strong></div>
+      <div class="del-info-row">🗂️ ประเภท: <strong id="del-type">—</strong></div>
+      <div class="del-info-row">📅 วันที่: <strong id="del-range">—</strong></div>
+    </div>
+    <div class="del-btn-row">
+      <button class="del-cancel" onclick="closeDelModal()">ยกเลิก</button>
+      <button id="del-confirm-btn" onclick="doDelete()">🗑️ ยืนยันลบ</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
+let allData = [];
+let dataLoaded = false;
+const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌' };
+const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ'];
+function thDate(s) {
+  if (!s||s==='undefined'||s==='null'||s==='-') return '-';
+  s = String(s).trim();
+  let y,m,d;
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+    const p=s.split('-'); y=Number(p[0]); m=Number(p[1]); d=Number(p[2]);
+  } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const p=s.split('/'); d=Number(p[0]); m=Number(p[1]); y=Number(p[2]);
+  } else { return s; }
+  if (!y||!m||!d||isNaN(y)||isNaN(m)||isNaN(d)||m<1||m>12||d<1||d>31) return '-';
+  return `${d} ${TH_M[m]} ${y+543}`;
+}
+function dayCount(a,b) { if (!a||!b) return 1; const da=new Date(a),db=new Date(b); if (isNaN(da)||isNaN(db)) return 1; return Math.round((db-da)/86400000)+1; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(msg,type) { const t=document.getElementById('toast'); t.innerText=msg; t.className='show '+(type||''); if(type==='success'){if(window.playSaveSuccess)playSaveSuccess();} else if(type==='error'){if(window.playSaveFail)playSaveFail();} setTimeout(()=>t.className='',3000); }
+
+// Set current month as default
+(function(){
+  const now = new Date();
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('f-month').value = mm;
+})();
+
+window.onload = loadData;
+
+async function loadData(force) {
+  if (!API) { document.getElementById('tbody').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
+  document.getElementById('tbody').innerHTML='<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
+  try {
+    allData = window.DataCache ? await DataCache.getLeaves(force) : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
+    dataLoaded = true;
+    const depts=[...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
+    const sel=document.getElementById('f-dept'); const cur=sel.value;
+    sel.innerHTML='<option value="">ทุกแผนก</option>';
+    depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+    applyFilters();
+  } catch(e) {
+    document.getElementById('tbody').innerHTML=`<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${e.message}</small></p></div>`;
+    showToast('❌ โหลดข้อมูลไม่ได้','error');
+  }
+}
+
+function onFilterChange() {
+  // If data already loaded, apply immediately; otherwise wait for explicit search
+  if (dataLoaded) applyFilters();
+}
+
+function applyFilters() {
+  if (!dataLoaded) {
+    loadData(false);
+    return;
+  }
+  const dept = document.getElementById('f-dept').value;
+  const month = document.getElementById('f-month').value;
+  const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
+
+  let rows = allData.filter(r => {
+    if (dept && r.dept !== dept) return false;
+    if (month) {
+      // Check if month overlaps with dateFrom/dateTo range
+      const from = r.dateFrom || '', to = r.dateTo || r.dateFrom || '';
+      if (!from) return false;
+      const fromMM = from.slice(5,7), toMM = to.slice(5,7);
+      const fromYYYY = from.slice(0,4), toYYYY = to.slice(0,4);
+      // Build month keys for range
+      const startKey = fromYYYY+'-'+fromMM, endKey = toYYYY+'-'+toMM;
+      const now = new Date();
+      const yr = String(now.getFullYear());
+      const testKey = yr+'-'+month;
+      // Simple overlap: if testKey is between startKey and endKey (same year assumption is ok here)
+      if (testKey < startKey || testKey > endKey) {
+        // Also check cross-year: if start is this year or previous, and end covers month
+        const startDate = new Date(fromYYYY, Number(fromMM)-1, 1);
+        const endDate = new Date(toYYYY, Number(toMM)-1, 28);
+        // Check all possible years
+        let found = false;
+        for (let y = Number(fromYYYY); y <= Number(toYYYY)+1; y++) {
+          const checkDate = new Date(y, Number(month)-1, 15);
+          if (checkDate >= startDate && checkDate <= endDate) { found=true; break; }
+        }
+        if (!found) return false;
+      }
+    }
+    if (search) {
+      const name = (r.name || '').toLowerCase();
+      if (!name.includes(search)) return false;
+    }
+    return true;
+  });
+
+  let indexed = rows.map((r,_) => ({r, idx: allData.indexOf(r)}));
+  indexed.sort((a,b) => b.idx - a.idx);
+
+  TYPES.forEach(t => { document.getElementById('s-'+t).innerText = rows.filter(r=>r.leaveType===t).length; });
+  document.getElementById('t-count').innerText = rows.length + ' รายการ';
+
+  if (rows.length === 0) {
+    document.getElementById('tbody').innerHTML = '<div class="empty-state"><div class="ei">📭</div><p>ไม่พบข้อมูลที่ตรงกัน</p></div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th><th>วันที่ไป</th><th>วันที่กลับ</th><th>จำนวน</th><th></th></tr></thead><tbody>`;
+  indexed.forEach(({r,idx},pos) => {
+    const days=dayCount(r.dateFrom,r.dateTo), icon=TYPE_ICON[r.leaveType]||'', badgeCls=`b-${r.leaveType}`, isNewest=pos===0;
+    html+=`<tr id="row-${idx}"><td class="fw6">${esc(r.name)}${isNewest?'<span class="new-badge">ใหม่</span>':''}</td><td><span class="dept-tag">${esc(r.dept||'-')}</span></td><td><span class="badge ${badgeCls}">${icon} ${esc(r.leaveType)}</span></td><td class="nowrap">${thDate(r.dateFrom)}</td><td class="nowrap">${thDate(r.dateTo)}</td><td><span class="days-pill">${days} วัน</span></td><td><button class="del-btn" onclick="confirmDelete(${idx})">🗑️</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('tbody').innerHTML = html;
+}
+
+let pendingDeleteIdx = -1;
+function confirmDelete(idx) {
+  const r=allData[idx]; if (!r) return; pendingDeleteIdx=idx;
+  document.getElementById('del-name').innerText=r.name;
+  document.getElementById('del-type').innerText=(TYPE_ICON[r.leaveType]||'')+' '+r.leaveType;
+  document.getElementById('del-range').innerText=thDate(r.dateFrom)+(r.dateFrom!==r.dateTo?' → '+thDate(r.dateTo):'');
+  document.getElementById('del-modal').classList.add('show');
+}
+function closeDelModal() { document.getElementById('del-modal').classList.remove('show'); pendingDeleteIdx=-1; }
+async function doDelete() {
+  const r=allData[pendingDeleteIdx]; if (!r) return;
+  document.getElementById('del-confirm-btn').disabled=true; document.getElementById('del-confirm-btn').innerText='⏳ กำลังลบ...';
+  try {
+    const res=await fetch(API,{method:'POST',body:JSON.stringify({action:'deleteLeave',name:r.name,dept:r.dept,leaveType:r.leaveType,dateFrom:r.dateFrom,dateTo:r.dateTo})});
+    const data=await res.json();
+    if (data.success) { allData.splice(pendingDeleteIdx,1); closeDelModal(); applyFilters(); showToast('🗑️ ลบรายการเรียบร้อย','success'); if(window.DataCache)DataCache.invalidate(); }
+    else { showToast('❌ '+(data.message||'ลบไม่สำเร็จ'),'error'); }
+  } catch(e) { showToast('❌ เชื่อมต่อไม่ได้: '+e.message,'error'); }
+  document.getElementById('del-confirm-btn').disabled=false; document.getElementById('del-confirm-btn').innerText='🗑️ ยืนยันลบ';
+}
+function clearFilters() {
+  document.getElementById('f-dept').value='';
+  document.getElementById('f-month').value='';
+  document.getElementById('f-search').value='';
+  if (dataLoaded) applyFilters();
+  else document.getElementById('tbody').innerHTML='<div class="empty-state"><div class="ei">🗂️</div><p>เลือกแผนกและเดือน แล้วกด <strong>แสดง</strong></p></div>';
+}
+</script>
+
+<button id="dm-btn" title="สลับ Dark/Light Mode" aria-label="Toggle dark mode">🌙</button>
+<script>
+(function(){
+  var html = document.documentElement;
+  var btn  = document.getElementById('dm-btn');
+  function applyTheme(dark){
+    if(dark){ html.classList.add('dark'); btn.textContent='☀️'; }
+    else     { html.classList.remove('dark'); btn.textContent='🌙'; }
+  }
+  var saved = localStorage.getItem('theme');
+  applyTheme(saved === 'dark');
+  btn.addEventListener('click', function(){
+    var isDark = html.classList.contains('dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    applyTheme(!isDark);
+  });
+})();
+</script>
+</body>
+</html>

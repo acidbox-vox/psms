@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ระบบจำหน่ายบุคลากร</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<script src="js/api-config.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/cache.js"></script>
+<script>
+// Auth guard — redirect to login if not logged in
+(function(){
+  if(!sessionStorage.getItem('loggedIn')){
+    window.location.replace('login.html');
+  }
+})();
+</script>
+<style>
+:root {
+  --bg: #f4f6fb;
+  --bg2: #eef1f8;
+  --surface: #ffffff;
+  --surface-hover: #f8faff;
+  --border: #e2e8f0;
+  --border-hover: #c7d4e8;
+  --text: #1a2340;
+  --text2: #5a6a8a;
+  --text3: #9aaac0;
+  --blue: #3b7cf4;
+  --blue-light: rgba(59,124,244,0.08);
+  --green: #10b981;
+  --green-light: rgba(16,185,129,0.08);
+  --purple: #7c3aed;
+  --purple-light: rgba(124,58,237,0.08);
+  --teal: #0d9488;
+  --teal-light: rgba(13,148,136,0.08);
+  --shadow: 0 2px 12px rgba(26,35,64,0.07);
+  --shadow-hover: 0 8px 32px rgba(26,35,64,0.13);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Sarabun', sans-serif;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 48px 16px 96px;
+  position: relative; overflow-x: hidden;
+}
+
+/* subtle dot grid */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(59,124,244,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* top accent bar */
+body::after {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 10;
+  background: linear-gradient(90deg, var(--blue), var(--purple), var(--teal));
+}
+
+.wrap {
+  width: 100%; max-width: 480px;
+  position: relative; z-index: 1;
+}
+
+/* ── Brand ── */
+.brand {
+  text-align: center; margin-bottom: 48px;
+  animation: slideDown .6s cubic-bezier(.22,.68,0,1.2) both;
+}
+@keyframes slideDown { from { opacity:0; transform:translateY(-18px); } to { opacity:1; transform:none; } }
+
+.brand-ring {
+  width: 72px; height: 72px; border-radius: 22px; margin: 0 auto 18px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow), 0 0 0 6px rgba(59,124,244,0.06);
+}
+.brand-img { width: 44px; height: 44px; object-fit: contain; }
+
+.brand h1 {
+  font-size: 1.8em; font-weight: 800; color: var(--text); letter-spacing: -0.025em;
+}
+.brand-sub {
+  font-size: 0.84em; color: var(--text2); margin-top: 8px; line-height: 1.6;
+}
+.brand-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 12px; padding: 5px 14px; border-radius: 20px;
+  background: var(--blue-light); border: 1px solid rgba(59,124,244,0.2);
+  font-size: 0.72em; font-weight: 700; color: var(--blue); letter-spacing: .05em;
+}
+
+/* ── Menu grid ── */
+.menu-grid { display: flex; flex-direction: column; gap: 10px; }
+
+.menu-card {
+  position: relative; overflow: hidden;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 18px; padding: 20px 20px 20px 22px;
+  cursor: pointer; transition: all .25s cubic-bezier(.22,.68,0,1.1);
+  display: flex; align-items: center; gap: 16px;
+  text-decoration: none; color: inherit;
+  box-shadow: var(--shadow);
+  animation: cardIn .5s ease both;
+}
+.menu-card:nth-child(1) { animation-delay: .12s; }
+.menu-card:nth-child(2) { animation-delay: .20s; }
+.menu-card:nth-child(3) { animation-delay: .28s; }
+.menu-card:nth-child(4) { animation-delay: .36s; }
+@keyframes cardIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+
+.menu-card:hover {
+  border-color: var(--border-hover);
+  background: var(--surface-hover);
+  transform: translateY(-3px) scale(1.005);
+  box-shadow: var(--shadow-hover);
+}
+
+/* left accent stripe */
+.menu-card::before {
+  content: ''; position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 3px 3px 0; opacity: 0;
+  transition: opacity .25s;
+}
+.menu-card:hover::before { opacity: 1; }
+.card-blue::before  { background: var(--blue); }
+.card-green::before { background: var(--green); }
+.card-purple::before{ background: var(--purple); }
+.card-teal::before  { background: var(--teal); }
+
+/* icon box */
+.menu-icon {
+  width: 50px; height: 50px; border-radius: 14px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+}
+.ic-blue   { background: var(--blue-light);   border: 1.5px solid rgba(59,124,244,0.18); }
+.ic-green  { background: var(--green-light);  border: 1.5px solid rgba(16,185,129,0.18); }
+.ic-purple { background: var(--purple-light); border: 1.5px solid rgba(124,58,237,0.18); }
+.ic-teal   { background: var(--teal-light);   border: 1.5px solid rgba(13,148,136,0.18); }
+
+.menu-info { flex: 1; min-width: 0; }
+.menu-num {
+  font-size: 0.65em; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 3px;
+}
+.menu-name { font-size: 1em; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.menu-desc { font-size: 0.77em; color: var(--text2); margin-top: 3px; line-height: 1.4; }
+
+.menu-arr {
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text3); font-size: 16px; transition: all .25s;
+}
+.menu-card:hover .menu-arr {
+  color: var(--text2); border-color: var(--border-hover);
+  background: var(--bg2); transform: translateX(3px);
+}
+
+/* ── Footer ── */
+.footer {
+  margin-top: 40px; text-align: center; font-size: 0.72em;
+  color: var(--text3); animation: fadeIn 1s ease .6s both;
+  position: relative; z-index: 1;
+}
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+/* ═══════════════════════════════
+   DARK MODE  (toggle via #dm-btn)
+═══════════════════════════════ */
+html, body { transition: background-color .35s ease, color .35s ease; }
+*, *::before, *::after { transition: background-color .35s ease, border-color .35s ease, color .35s ease, box-shadow .35s ease, opacity .35s ease; }
+
+html.dark {
+  --bg: #0f1117;
+  --bg2: #161b27;
+  --surface: #1c2133;
+  --surface-hover: #232a40;
+  --border: #2a3352;
+  --border-hover: #3a4a6e;
+  --text: #e8edf8;
+  --text2: #8a9abf;
+  --text3: #4a5a7a;
+  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  --shadow-hover: 0 8px 32px rgba(0,0,0,0.55);
+  --blue-light: rgba(59,124,244,0.15);
+  --green-light: rgba(16,185,129,0.12);
+  --purple-light: rgba(124,58,237,0.15);
+  --teal-light: rgba(13,148,136,0.12);
+}
+html.dark select, html.dark select option { background: var(--surface); color: var(--text); }
+html.dark input[type="date"] { background: var(--surface); color: var(--text); color-scheme: dark; }
+html.dark #toast { background: var(--surface) !important; }
+html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !important; }
+
+/* ─── Float toggle button ─── */
+#dm-btn {
+  position: fixed; top: 14px; right: 18px; z-index: 9999;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--surface); border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-hover); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; line-height: 1;
+  transition: transform .2s ease, background-color .35s ease, border-color .35s ease, box-shadow .35s ease;
+  user-select: none;
+}
+#dm-btn:hover { transform: scale(1.13) rotate(18deg); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-ring">
+      <img src="logowing23.png" class="brand-img" alt="กองบิน ๒๓">
+    </div>
+    <h1>ระบบจำหน่ายบุคลากร</h1>
+    <p class="brand-sub">บันทึกและติดตามการปฏิบัติงาน<br>ป้องกันการจำหน่ายวันซ้ำซ้อน</p>
+    <div class="brand-pill">✦ กองบิน ๒๓</div>
+    <div id="unitBadge" style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);font-size:0.78em;font-weight:700;color:#10b981;"></div>
+  </div>
+
+  <div class="menu-grid">
+    <a href="leave-form.html" class="menu-card card-blue">
+      <div class="menu-icon ic-blue">📝</div>
+      <div class="menu-info">
+        <div class="menu-num">เมนู 01</div>
+        <div class="menu-name">บันทึกการจำหน่าย</div>
+        <div class="menu-desc">จำหน่ายข้อมูลกำลังพลในหน่วย</div>
+      </div>
+      <div class="menu-arr">›</div>
+    </a>
+
+    <a href="leave-status.html" class="menu-card card-green">
+      <div class="menu-icon ic-green">📊</div>
+      <div class="menu-info">
+        <div class="menu-num">เมนู 02</div>
+        <div class="menu-name">สถานะจำหน่าย</div>
+        <div class="menu-desc">ภาพรวมทั้งหมด กรองแผนก / วันที่</div>
+      </div>
+      <div class="menu-arr">›</div>
+    </a>
+
+    <a href="leave-calendar.html" class="menu-card card-purple">
+      <div class="menu-icon ic-purple">📅</div>
+      <div class="menu-info">
+        <div class="menu-num">เมนู 03</div>
+        <div class="menu-name">ปฏิทินการจำหน่าย</div>
+        <div class="menu-desc">ดูวันไหนใครออกไปไหนบ้าง กรองแผนก</div>
+      </div>
+      <div class="menu-arr">›</div>
+    </a>
+
+    <a href="leave-available.html" class="menu-card card-teal">
+      <div class="menu-icon ic-teal">🟢</div>
+      <div class="menu-info">
+        <div class="menu-num">เมนู 04</div>
+        <div class="menu-name">กำลังพลที่ว่าง</div>
+        <div class="menu-desc">ดูว่าใครว่างในแต่ละเดือน แยกตามแผนก</div>
+      </div>
+      <div class="menu-arr">›</div>
+    </a>
+  </div>
+</div>
+
+<div class="footer">ระบบจำหน่ายบุคลากร · กองบิน ๒๓</div>
+
+<!-- Logout button -->
+<button id="logout-btn" onclick="doLogout()" title="ออกจากระบบ" style="
+  position:fixed;top:14px;left:18px;z-index:9999;
+  padding:8px 14px;border-radius:20px;
+  background:#fff;border:1.5px solid #e2e8f0;
+  box-shadow:0 2px 12px rgba(26,35,64,0.1);
+  cursor:pointer;font-family:'Sarabun',sans-serif;
+  font-size:0.78em;font-weight:700;color:#5a6a8a;
+  display:flex;align-items:center;gap:5px;
+  transition:all .2s ease;
+">🚪 ออกจากระบบ</button>
+<script>
+// Show unit name
+var uName = sessionStorage.getItem('unitName');
+var badge = document.getElementById('unitBadge');
+if(uName && badge){ badge.textContent = '📞 ' + uName; }
+
+// Preload ข้อมูลล่วงหน้าขณะอยู่หน้าหลัก
+if(window.DataCache) DataCache.preload();
+
+function doLogout(){
+  sessionStorage.removeItem('loggedIn');
+  sessionStorage.removeItem('unitName');
+  sessionStorage.removeItem('unitCode');
+  if(window.DataCache) DataCache.invalidate();
+  window.location.replace('login.html');
+}
+</script>
+
+<button id="dm-btn" title="สลับ Dark/Light Mode" aria-label="Toggle dark mode">🌙</button>
+<script>
+(function(){
+  var html = document.documentElement;
+  var btn  = document.getElementById('dm-btn');
+  function applyTheme(dark){
+    if(dark){ html.classList.add('dark'); btn.textContent='☀️'; }
+    else     { html.classList.remove('dark'); btn.textContent='🌙'; }
+  }
+  var saved = localStorage.getItem('theme');
+  applyTheme(saved === 'dark');
+  btn.addEventListener('click', function(){
+    var isDark = html.classList.contains('dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    applyTheme(!isDark);
+  });
+})();
+</script>
+</body>
+</html>
