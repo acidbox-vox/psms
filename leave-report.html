@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>รายงานสถานะจำหน่าย</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<script src="js/api-config.js"></script>
+<script src="js/cache.js"></script>
+<script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
+<style>
+/* ═══════════════════════════════════════
+   BASE (screen)
+═══════════════════════════════════════ */
+:root {
+  --bg: #f4f6fb;
+  --bg2: #eef1f8;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #1a2340;
+  --text2: #5a6a8a;
+  --text3: #9aaac0;
+  --blue: #3b7cf4;
+  --shadow: 0 2px 12px rgba(26,35,64,0.07);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Sarabun', sans-serif;
+  min-height: 100vh; background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 16px 80px;
+}
+body::after {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 10;
+  background: linear-gradient(90deg, #10b981, #3b7cf4);
+}
+
+/* Topbar */
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 22px 0 18px; width: 100%; max-width: 900px;
+}
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text2); font-size: 0.82em; font-weight: 600; cursor: pointer; text-decoration: none;
+  box-shadow: var(--shadow); transition: all .2s;
+}
+.back-btn:hover { color: var(--text); border-color: #c7d4e8; }
+.page-title { font-size: 1em; font-weight: 700; flex: 1; }
+
+/* Wrap */
+.wrap { width: 100%; max-width: 900px; }
+
+/* Filter card */
+.filter-card {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; margin-bottom: 14px; box-shadow: var(--shadow);
+}
+.filter-title { font-size: 0.7em; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+.filter-group label { font-size: 0.72em; font-weight: 600; color: var(--text2); }
+.sel-wrap { position: relative; }
+.sel-wrap::after { content: '▾'; position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; font-size: 12px; }
+select, input[type="text"] {
+  width: 100%; padding: 9px 12px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 9px; color: var(--text); font-size: 13px; font-family: 'Sarabun', sans-serif;
+  outline: none; transition: all .2s; appearance: none; -webkit-appearance: none;
+}
+select { cursor: pointer; }
+select option { background: #fff; }
+select:focus, input[type="text"]:focus { border-color: rgba(59,124,244,0.5); background: #fff; box-shadow: 0 0 0 3px rgba(59,124,244,0.08); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; align-items: center; }
+.btn { padding: 9px 18px; border-radius: 9px; font-family: 'Sarabun', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; border: 1.5px solid; transition: all .2s; white-space: nowrap; }
+.btn-primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+.btn-primary:hover { background: #2563d0; border-color: #2563d0; }
+.btn-ghost { background: var(--surface); color: var(--text2); border-color: var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: #c7d4e8; }
+.btn-print { background: #059669; color: #fff; border-color: #059669; }
+.btn-print:hover { background: #047857; border-color: #047857; }
+
+/* ═══════════════════════════════════════
+   REPORT (screen preview)
+═══════════════════════════════════════ */
+.report-wrap {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.report-inner { padding: 32px 36px; }
+
+/* Report header */
+.rpt-header { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; border-bottom: 2px solid var(--border); padding-bottom: 16px; }
+.rpt-logo { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
+.rpt-logo-placeholder { width: 64px; height: 64px; border-radius: 50%; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
+.rpt-title-block { flex: 1; }
+.rpt-org { font-size: 0.78em; color: var(--text2); font-weight: 600; margin-bottom: 2px; }
+.rpt-title { font-size: 1.3em; font-weight: 800; color: var(--text); line-height: 1.2; }
+.rpt-sub { font-size: 0.78em; color: var(--text3); margin-top: 4px; }
+.rpt-meta { text-align: right; font-size: 0.74em; color: var(--text3); line-height: 1.8; flex-shrink: 0; }
+.rpt-meta strong { color: var(--text2); }
+
+/* Summary badges */
+.rpt-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.sum-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px; font-size: 0.8em; font-weight: 700; border: 1.5px solid;
+}
+.sum-total { background: rgba(59,124,244,0.08); color: var(--blue); border-color: rgba(59,124,244,0.25); }
+.sum-la    { background: rgba(239,68,68,0.08);   color: #dc2626; border-color: rgba(239,68,68,0.2); }
+.sum-study { background: rgba(124,58,237,0.08);  color: #7c3aed; border-color: rgba(124,58,237,0.2); }
+.sum-gov   { background: rgba(59,124,244,0.08);  color: var(--blue); border-color: rgba(59,124,244,0.2); }
+.sum-ot    { background: rgba(5,150,105,0.08);   color: #059669; border-color: rgba(5,150,105,0.2); }
+.sum-duty  { background: rgba(8,145,178,0.08);   color: #0891b2; border-color: rgba(8,145,178,0.2); }
+.sum-other { background: rgba(217,119,6,0.08);   color: #d97706; border-color: rgba(217,119,6,0.2); }
+
+/* Table */
+.rpt-table-wrap { overflow-x: auto; margin-top: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+thead th {
+  padding: 9px 12px; text-align: left;
+  font-size: 0.72em; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text3); background: var(--bg); border-bottom: 1.5px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid var(--border); }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:nth-child(even) { background: rgba(244,246,251,0.6); }
+tbody td { padding: 8px 12px; color: var(--text); vertical-align: middle; }
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 9px; border-radius: 20px; font-size: 0.8em; font-weight: 700; white-space: nowrap;
+}
+.b-ลา       { background: rgba(239,68,68,0.08);   color: #dc2626; border: 1px solid rgba(239,68,68,0.2); }
+.b-ศึกษา    { background: rgba(124,58,237,0.08);  color: #7c3aed; border: 1px solid rgba(124,58,237,0.2); }
+.b-ราชการ   { background: rgba(59,124,244,0.08);  color: var(--blue); border: 1px solid rgba(59,124,244,0.2); }
+.b-ล่วงเวลา { background: rgba(5,150,105,0.08);   color: #059669; border: 1px solid rgba(5,150,105,0.2); }
+.b-อื่นๆ    { background: rgba(217,119,6,0.08);   color: #d97706; border: 1px solid rgba(217,119,6,0.2); }
+.b-เวร      { background: rgba(8,145,178,0.08);   color: #0891b2; border: 1px solid rgba(8,145,178,0.2); }
+.dept-tag { display: inline-block; padding: 1px 8px; border-radius: 5px; background: var(--bg2); font-size: 0.85em; color: var(--text2); border: 1px solid var(--border); }
+.days-pill { display: inline-block; padding: 1px 7px; border-radius: 5px; background: var(--bg); font-size: 0.85em; color: var(--text3); font-weight: 700; border: 1px solid var(--border); }
+.no-col { color: var(--text3); font-size: 0.85em; }
+.rpt-footer { margin-top: 28px; padding-top: 14px; border-top: 1.5px solid var(--border); display: flex; justify-content: space-between; align-items: flex-end; font-size: 0.74em; color: var(--text3); }
+
+/* Empty / loading */
+.empty-state { text-align: center; padding: 60px 24px; color: var(--text3); }
+.empty-state .ei { font-size: 36px; margin-bottom: 10px; }
+.loading-row { text-align: center; padding: 44px; color: var(--text3); font-size: .9em; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.spinner { width: 15px; height: 15px; border: 2px solid rgba(59,124,244,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+.wrap { animation: fadeUp .35s ease; }
+
+/* ═══════════════════════════════════════
+   PRINT / PDF
+═══════════════════════════════════════ */
+@media print {
+  @page { size: A4 portrait; margin: 15mm 14mm 18mm 14mm; }
+
+  body {
+    background: #fff !important; padding: 0 !important;
+    display: block !important; align-items: unset !important;
+  }
+  body::after { display: none !important; }
+
+  .topbar, .filter-card, #dm-btn, .no-print { display: none !important; }
+
+  .wrap { max-width: 100% !important; animation: none !important; }
+
+  .report-wrap {
+    border: none !important; border-radius: 0 !important;
+    box-shadow: none !important; overflow: visible !important;
+  }
+  .report-inner { padding: 0 !important; }
+
+  /* Header */
+  .rpt-header { border-bottom: 2px solid #1a2340 !important; padding-bottom: 10px !important; }
+  .rpt-logo { width: 56px !important; height: 56px !important; }
+  .rpt-title { font-size: 1.15em !important; }
+  .rpt-org { font-size: 0.75em !important; }
+  .rpt-meta { font-size: 0.72em !important; }
+
+  /* Summary */
+  .rpt-summary { margin: 10px 0 !important; gap: 6px !important; }
+  .sum-badge { padding: 4px 10px !important; font-size: 0.75em !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Table */
+  table { font-size: 0.8em !important; }
+  thead th { padding: 7px 10px !important; background: #f4f6fb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tbody td { padding: 6px 10px !important; }
+  tbody tr:nth-child(even) { background: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tbody tr { page-break-inside: avoid; }
+
+  .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .dept-tag, .days-pill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .rpt-footer { margin-top: 16px !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar no-print">
+  <a href="leave-status.html" class="back-btn">← สถานะจำหน่าย</a>
+  <span class="page-title">🖨️ รายงานสถานะจำหน่าย</span>
+</div>
+
+<div class="wrap">
+
+  <!-- ─── Filter (screen only) ─── -->
+  <div class="filter-card no-print">
+    <div class="filter-title">🔍 เลือกข้อมูลที่ต้องการพิมพ์</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>แผนก</label>
+        <div class="sel-wrap">
+          <select id="f-dept" onchange="genReport()">
+            <option value="">ทุกแผนก</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>เดือน</label>
+        <div class="sel-wrap">
+          <select id="f-month" onchange="genReport()">
+            <option value="">ทุกเดือน</option>
+            <option value="01">มกราคม</option>
+            <option value="02">กุมภาพันธ์</option>
+            <option value="03">มีนาคม</option>
+            <option value="04">เมษายน</option>
+            <option value="05">พฤษภาคม</option>
+            <option value="06">มิถุนายน</option>
+            <option value="07">กรกฎาคม</option>
+            <option value="08">สิงหาคม</option>
+            <option value="09">กันยายน</option>
+            <option value="10">ตุลาคม</option>
+            <option value="11">พฤศจิกายน</option>
+            <option value="12">ธันวาคม</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-group" style="min-width:160px">
+        <label>ค้นหารายชื่อ</label>
+        <input type="text" id="f-search" placeholder="พิมพ์ชื่อ..." oninput="genReport()">
+      </div>
+      <div class="filter-group" style="flex:0">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="clearFilters()">✕ ล้าง</button>
+          <button class="btn btn-ghost" onclick="loadData(true)">🔄 รีเฟรช</button>
+          <button class="btn btn-print" onclick="printReport()">🖨️ พิมพ์ / Export PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Report body ─── -->
+  <div class="report-wrap" id="report-wrap">
+    <div class="report-inner" id="report-inner">
+      <div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
+let allData = [];
+
+const TH_M_FULL = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TYPE_ICON  = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌' };
+const TYPE_SUM   = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ'];
+const TYPE_CLS   = { 'ลา':'sum-la','ศึกษา':'sum-study','ราชการ':'sum-gov','ล่วงเวลา':'sum-ot','เวร':'sum-duty','อื่นๆ':'sum-other' };
+
+function thDate(s) {
+  if (!s||s==='-') return '-';
+  s = String(s).trim();
+  let y,m,d;
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) { const p=s.split('-'); y=+p[0]; m=+p[1]; d=+p[2]; }
+  else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) { const p=s.split('/'); d=+p[0]; m=+p[1]; y=+p[2]; }
+  else return s;
+  if (!y||!m||!d||m<1||m>12||d<1||d>31) return '-';
+  return `${d} ${TH_M_SHORT[m]} ${y+543}`;
+}
+function dayCount(a,b) { if (!a||!b) return 1; const da=new Date(a),db=new Date(b); if(isNaN(da)||isNaN(db)) return 1; return Math.round((db-da)/86400000)+1; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function nowTH() {
+  const n=new Date(), d=n.getDate(), m=n.getMonth()+1, y=n.getFullYear()+543;
+  const hh=String(n.getHours()).padStart(2,'0'), mm2=String(n.getMinutes()).padStart(2,'0');
+  return `${d} ${TH_M_FULL[m]} ${y}  เวลา ${hh}:${mm2} น.`;
+}
+
+// Set current month as default on load
+(function(){
+  const mm = String(new Date().getMonth()+1).padStart(2,'0');
+  document.getElementById('f-month').value = mm;
+})();
+
+window.onload = loadData;
+
+async function loadData(force) {
+  document.getElementById('report-inner').innerHTML = '<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
+  if (!API) { document.getElementById('report-inner').innerHTML = '<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
+  try {
+    allData = window.DataCache ? await DataCache.getLeaves(force) : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
+    const depts = [...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
+    const sel = document.getElementById('f-dept'); const cur = sel.value;
+    sel.innerHTML = '<option value="">ทุกแผนก</option>';
+    depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+    genReport();
+  } catch(e) {
+    document.getElementById('report-inner').innerHTML = `<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${esc(e.message)}</small></p></div>`;
+  }
+}
+
+function filterRows() {
+  const dept   = document.getElementById('f-dept').value;
+  const month  = document.getElementById('f-month').value;
+  const search = (document.getElementById('f-search').value||'').trim().toLowerCase();
+  return allData.filter(r => {
+    if (dept && r.dept !== dept) return false;
+    if (month) {
+      const from = r.dateFrom||'', to = r.dateTo||r.dateFrom||'';
+      if (!from) return false;
+      const startDate = new Date(from.slice(0,4), +from.slice(5,7)-1, 1);
+      const endDate   = new Date(to.slice(0,4),   +to.slice(5,7)-1,   28);
+      let found = false;
+      for (let y = startDate.getFullYear(); y <= endDate.getFullYear()+1; y++) {
+        const check = new Date(y, +month-1, 15);
+        if (check >= startDate && check <= endDate) { found=true; break; }
+      }
+      if (!found) return false;
+    }
+    if (search && !(r.name||'').toLowerCase().includes(search)) return false;
+    return true;
+  });
+}
+
+function genReport() {
+  const rows   = filterRows();
+  const dept   = document.getElementById('f-dept').value;
+  const month  = document.getElementById('f-month').value;
+  const search = (document.getElementById('f-search').value||'').trim();
+  const unitName = sessionStorage.getItem('unitName') || '';
+
+  // ── subtitle text ──
+  let subtitle = '';
+  if (dept)  subtitle += `แผนก: ${dept}`;
+  if (month) subtitle += (subtitle?'  |  ':'') + `เดือน: ${TH_M_FULL[+month]}`;
+  if (search) subtitle += (subtitle?'  |  ':'') + `ค้นหา: "${search}"`;
+  if (!subtitle) subtitle = 'แสดงข้อมูลทั้งหมด';
+
+  // ── sort newest first ──
+  const indexed = rows.map((r,_)=>({r,idx:allData.indexOf(r)}));
+  indexed.sort((a,b)=>b.idx-a.idx);
+
+  // ── summary counts ──
+  const sumCounts = {};
+  TYPE_SUM.forEach(t => sumCounts[t] = rows.filter(r=>r.leaveType===t).length);
+
+  // ── logo ──
+  const logoHtml = `<img src="logowing23.png" class="rpt-logo" alt="logo" onerror="this.style.display='none'">`;
+
+  // ── header ──
+  let html = `
+  <div class="rpt-header">
+    ${logoHtml}
+    <div class="rpt-title-block">
+      <div class="rpt-org">${esc(unitName) || 'ระบบบันทึกการจำหน่าย'}</div>
+      <div class="rpt-title">รายงานสถานะการจำหน่ายกำลังพล</div>
+      <div class="rpt-sub">${esc(subtitle)}</div>
+    </div>
+    <div class="rpt-meta">
+      <div>พิมพ์เมื่อ</div>
+      <div><strong>${nowTH()}</strong></div>
+      <div style="margin-top:4px">รายการทั้งหมด <strong>${rows.length}</strong> รายการ</div>
+    </div>
+  </div>`;
+
+  // ── summary badges ──
+  html += `<div class="rpt-summary">
+    <span class="sum-badge sum-total">📋 รวม ${rows.length} รายการ</span>`;
+  TYPE_SUM.forEach(t => {
+    if (sumCounts[t] > 0) html += `<span class="sum-badge ${TYPE_CLS[t]}">${TYPE_ICON[t]||''} ${t} ${sumCounts[t]}</span>`;
+  });
+  html += `</div>`;
+
+  // ── table ──
+  if (rows.length === 0) {
+    html += `<div class="empty-state"><div class="ei">📭</div><p>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</p></div>`;
+  } else {
+    html += `<div class="rpt-table-wrap"><table>
+      <thead><tr>
+        <th style="width:32px">#</th>
+        <th>ชื่อ - นามสกุล</th>
+        <th>แผนก</th>
+        <th>ประเภท</th>
+        <th>วันที่ไป</th>
+        <th>วันที่กลับ</th>
+        <th style="text-align:center">จำนวน</th>
+      </tr></thead>
+      <tbody>`;
+    indexed.forEach(({r,idx}, pos) => {
+      const days = dayCount(r.dateFrom, r.dateTo);
+      const icon = TYPE_ICON[r.leaveType] || '';
+      html += `<tr>
+        <td class="no-col">${pos+1}</td>
+        <td style="font-weight:600">${esc(r.name||'-')}</td>
+        <td><span class="dept-tag">${esc(r.dept||'-')}</span></td>
+        <td><span class="badge b-${esc(r.leaveType)}">${icon} ${esc(r.leaveType)}</span></td>
+        <td style="white-space:nowrap">${thDate(r.dateFrom)}</td>
+        <td style="white-space:nowrap">${thDate(r.dateTo)}</td>
+        <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  // ── footer ──
+  html += `<div class="rpt-footer">
+    <div>รายงานนี้ผลิตโดยระบบบันทึกการจำหน่าย${unitName?' · '+unitName:''}</div>
+    <div>พิมพ์เมื่อ ${nowTH()}</div>
+  </div>`;
+
+  document.getElementById('report-inner').innerHTML = html;
+}
+
+function clearFilters() {
+  document.getElementById('f-dept').value  = '';
+  document.getElementById('f-month').value = '';
+  document.getElementById('f-search').value = '';
+  genReport();
+}
+
+function printReport() {
+  window.print();
+}
+</script>
+
+</body>
+</html>
