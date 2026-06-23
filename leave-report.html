@@ -7,36 +7,38 @@
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 <script src="js/api-config.js"></script>
 <script src="js/cache.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
-:root {
-  --bg:#f4f6fb; --bg2:#eef1f8; --surface:#fff; --border:#e2e8f0;
-  --text:#1a2340; --text2:#5a6a8a; --text3:#9aaac0;
-  --blue:#3b7cf4; --green:#059669; --shadow:0 2px 12px rgba(26,35,64,.07);
+:root{
+  --bg:#f4f6fb;--bg2:#eef1f8;--surface:#fff;--border:#e2e8f0;
+  --text:#1a2340;--text2:#5a6a8a;--text3:#9aaac0;
+  --blue:#3b7cf4;--green:#059669;--shadow:0 2px 12px rgba(26,35,64,.07);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Sarabun',sans-serif;min-height:100vh;background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;align-items:center;padding:0 16px 80px}
 body::after{content:'';position:fixed;top:0;left:0;right:0;height:3px;z-index:10;
   background:linear-gradient(90deg,#10b981,#3b7cf4)}
-
-/* Topbar */
-.topbar{display:flex;align-items:center;gap:12px;padding:22px 0 18px;width:100%;max-width:960px}
+.topbar{display:flex;align-items:center;gap:12px;padding:22px 0 18px;width:100%;max-width:980px}
 .back-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;
   background:var(--surface);border:1.5px solid var(--border);color:var(--text2);
-  font-size:.82em;font-weight:600;cursor:pointer;text-decoration:none;
-  box-shadow:var(--shadow);transition:all .2s}
+  font-size:.82em;font-weight:600;cursor:pointer;text-decoration:none;box-shadow:var(--shadow);transition:all .2s}
 .back-btn:hover{color:var(--text);border-color:#c7d4e8}
 .page-title{font-size:1em;font-weight:700;flex:1}
-.wrap{width:100%;max-width:960px}
+.wrap{width:100%;max-width:980px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .wrap{animation:fadeUp .35s ease}
 
-/* Filter card */
+/* ── Filter card ── */
 .filter-card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;
   padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
 .filter-title{font-size:.7em;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
   color:var(--text3);margin-bottom:14px}
+.filter-section{margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed var(--border)}
+.filter-section:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+.section-lbl{font-size:.72em;font-weight:700;color:var(--text2);margin-bottom:8px;
+  display:flex;align-items:center;gap:5px}
 .filter-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .filter-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px}
 .filter-group label{font-size:.72em;font-weight:600;color:var(--text2)}
@@ -53,15 +55,47 @@ select:focus,input:focus{border-color:rgba(59,124,244,.5);background:#fff;
   box-shadow:0 0 0 3px rgba(59,124,244,.08)}
 
 /* mode toggle */
-.mode-toggle{display:flex;gap:0;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;background:var(--bg)}
-.mode-btn{flex:1;padding:8px 14px;border:none;background:transparent;font-family:'Sarabun',sans-serif;
+.mode-toggle{display:flex;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;background:var(--bg);height:38px}
+.mode-btn{flex:1;padding:0 14px;border:none;background:transparent;font-family:'Sarabun',sans-serif;
   font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;transition:all .2s;white-space:nowrap}
 .mode-btn.active{background:var(--blue);color:#fff}
 
-/* date range row */
-#range-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;
-  padding-top:10px;border-top:1px dashed var(--border)}
-.date-label{font-size:.72em;font-weight:600;color:var(--text2);margin-bottom:4px}
+/* Type checkboxes */
+.type-checks{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.type-check{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;
+  background:var(--bg);border:1.5px solid var(--border);cursor:pointer;transition:all .15s;
+  font-size:.82em;font-weight:600;user-select:none}
+.type-check:hover{border-color:#c7d4e8}
+.type-check input{display:none}
+.type-check.chk-ลา.on      {background:rgba(239,68,68,.09);border-color:rgba(239,68,68,.35);color:#dc2626}
+.type-check.chk-ศึกษา.on   {background:rgba(124,58,237,.09);border-color:rgba(124,58,237,.35);color:#7c3aed}
+.type-check.chk-ราชการ.on  {background:rgba(59,124,244,.09);border-color:rgba(59,124,244,.35);color:var(--blue)}
+.type-check.chk-ล่วงเวลา.on{background:rgba(5,150,105,.09);border-color:rgba(5,150,105,.35);color:#059669}
+.type-check.chk-เวร.on     {background:rgba(8,145,178,.09);border-color:rgba(8,145,178,.35);color:#0891b2}
+.type-check.chk-อื่นๆ.on   {background:rgba(217,119,6,.09);border-color:rgba(217,119,6,.35);color:#d97706}
+
+/* People tags */
+.people-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:220px}
+.people-search-row{display:flex;gap:6px}
+.people-input-wrap{position:relative;flex:1}
+.people-input-wrap input{padding-right:32px}
+.people-clear-input{position:absolute;right:9px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0}
+.people-dropdown{position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:100;
+  background:var(--surface);border:1.5px solid var(--border);border-radius:9px;
+  box-shadow:0 4px 18px rgba(26,35,64,.12);max-height:200px;overflow-y:auto;display:none}
+.people-dropdown.show{display:block}
+.pd-item{padding:9px 13px;cursor:pointer;font-size:.88em;transition:background .12s}
+.pd-item:hover{background:var(--bg)}
+.pd-item.selected{color:var(--text3);font-style:italic}
+.tags-wrap{display:flex;flex-wrap:wrap;gap:5px;min-height:24px}
+.person-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;
+  background:rgba(59,124,244,.1);border:1px solid rgba(59,124,244,.3);
+  color:var(--blue);font-size:.8em;font-weight:700}
+.person-tag button{background:none;border:none;cursor:pointer;color:inherit;padding:0;
+  font-size:11px;line-height:1;opacity:.7}
+.person-tag button:hover{opacity:1}
+.people-hint{font-size:.71em;color:var(--text3);margin-top:2px}
 
 /* Buttons */
 .btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -73,13 +107,13 @@ select:focus,input:focus{border-color:rgba(59,124,244,.5);background:#fff;
 .btn-ghost:hover{color:var(--text);border-color:#c7d4e8}
 .btn-print{background:var(--green);color:#fff;border-color:var(--green)}
 .btn-print:hover{background:#047857;border-color:#047857}
+.btn-excel{background:#217346;color:#fff;border-color:#217346}
+.btn-excel:hover{background:#1a5c38;border-color:#1a5c38}
 
 /* ── Report preview ── */
 .report-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:18px;
   box-shadow:var(--shadow);overflow:hidden}
 .report-inner{padding:32px 36px}
-
-/* Report header */
 .rpt-header{display:flex;align-items:center;gap:16px;margin-bottom:10px;
   border-bottom:2px solid var(--border);padding-bottom:16px}
 .rpt-logo{width:64px;height:64px;object-fit:contain;flex-shrink:0}
@@ -89,8 +123,6 @@ select:focus,input:focus{border-color:rgba(59,124,244,.5);background:#fff;
 .rpt-sub{font-size:.78em;color:var(--text3);margin-top:4px}
 .rpt-meta{text-align:right;font-size:.74em;color:var(--text3);line-height:1.8;flex-shrink:0}
 .rpt-meta strong{color:var(--text2)}
-
-/* Summary badges */
 .rpt-summary{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
 .sum-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;
   border-radius:20px;font-size:.8em;font-weight:700;border:1.5px solid}
@@ -101,8 +133,6 @@ select:focus,input:focus{border-color:rgba(59,124,244,.5);background:#fff;
 .sum-ot   {background:rgba(5,150,105,.08);color:#059669;border-color:rgba(5,150,105,.2)}
 .sum-duty {background:rgba(8,145,178,.08);color:#0891b2;border-color:rgba(8,145,178,.2)}
 .sum-other{background:rgba(217,119,6,.08);color:#d97706;border-color:rgba(217,119,6,.2)}
-
-/* Table */
 .rpt-table-wrap{overflow-x:auto;margin-top:8px}
 table{width:100%;border-collapse:collapse;font-size:.85em}
 thead th{padding:9px 12px;text-align:left;font-size:.72em;font-weight:700;
@@ -125,10 +155,17 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 .days-pill{display:inline-block;padding:1px 7px;border-radius:5px;background:var(--bg);
   font-size:.85em;color:var(--text3);font-weight:700;border:1px solid var(--border)}
 .no-col{color:var(--text3);font-size:.85em}
-.rpt-footer{margin-top:28px;padding-top:14px;border-top:1.5px solid var(--border);
-  display:flex;justify-content:space-between;align-items:flex-end;font-size:.74em;color:var(--text3)}
 
-/* Empty / loading */
+/* Certification */
+.rpt-cert{margin-top:32px;padding:20px 24px;border:1.5px dashed var(--border);
+  border-radius:10px;background:rgba(244,246,251,.5)}
+.rpt-cert p{font-size:.88em;line-height:1.9;color:var(--text)}
+.rpt-cert .sig-line{margin-top:16px;display:flex;align-items:flex-end;gap:32px;flex-wrap:wrap}
+.sig-block{display:flex;flex-direction:column;gap:4px;font-size:.83em;color:var(--text2)}
+.sig-dots{letter-spacing:2px;color:var(--text3)}
+
+.rpt-footer{margin-top:20px;padding-top:14px;border-top:1.5px solid var(--border);
+  display:flex;justify-content:space-between;align-items:flex-end;font-size:.74em;color:var(--text3)}
 .empty-state{text-align:center;padding:60px 24px;color:var(--text3)}
 .empty-state .ei{font-size:36px;margin-bottom:10px}
 .loading-row{text-align:center;padding:44px;color:var(--text3);font-size:.9em;
@@ -138,7 +175,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── PRINT ── */
-@media print {
+@media print{
   @page{size:A4 portrait;margin:15mm 14mm 18mm 14mm}
   body{background:#fff!important;padding:0!important;display:block!important}
   body::after{display:none!important}
@@ -148,8 +185,9 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
   .report-inner{padding:0!important}
   .rpt-header{border-bottom:2px solid #1a2340!important;padding-bottom:10px!important}
   .rpt-summary{margin:10px 0!important;gap:6px!important}
-  .sum-badge{padding:4px 10px!important;font-size:.75em!important;
+  .sum-badge,.badge,.dept-tag,.days-pill,.rpt-cert{
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sum-badge{padding:4px 10px!important;font-size:.75em!important}
   table{font-size:.8em!important}
   thead th{padding:7px 10px!important;background:#f4f6fb!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -157,7 +195,8 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
   tbody tr:nth-child(even){background:#f9fafb!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   tbody tr{page-break-inside:avoid}
-  .badge,.dept-tag,.days-pill{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rpt-cert{border:1.5px dashed #c0cce0!important;background:#fafbfd!important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .rpt-footer{margin-top:16px!important}
 }
 </style>
@@ -171,296 +210,349 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 
 <div class="wrap">
 
-  <!-- Filter -->
+  <!-- ═══ Filter card ═══ -->
   <div class="filter-card no-print">
-    <div class="filter-title">🔍 เลือกข้อมูลที่ต้องการพิมพ์</div>
+    <div class="filter-title">⚙️ ตั้งค่าการรายงาน</div>
 
-    <div class="filter-row">
-      <!-- แผนก -->
-      <div class="filter-group" style="min-width:150px">
-        <label>แผนก <span style="color:#dc2626">*</span></label>
-        <div class="sel-wrap">
-          <select id="f-dept">
-            <option value="">— เลือกแผนก —</option>
-          </select>
+    <!-- ① แผนก + ช่วงเวลา -->
+    <div class="filter-section">
+      <div class="section-lbl">🏢 แผนก &amp; ช่วงเวลา</div>
+      <div class="filter-row">
+        <div class="filter-group" style="min-width:150px">
+          <label>แผนก</label>
+          <div class="sel-wrap">
+            <select id="f-dept">
+              <option value="">— เลือกแผนก —</option>
+            </select>
+          </div>
         </div>
-      </div>
-
-      <!-- ช่วงเวลา: toggle เดือน / วันที่ -->
-      <div class="filter-group" style="min-width:200px;flex:0">
-        <label>ช่วงเวลา</label>
-        <div class="mode-toggle">
-          <button class="mode-btn active" id="btn-mode-month" onclick="setMode('month')">📅 เดือน</button>
-          <button class="mode-btn" id="btn-mode-range" onclick="setMode('range')">📆 ช่วงวัน</button>
+        <div class="filter-group" style="min-width:190px;flex:0">
+          <label>ช่วงเวลา</label>
+          <div class="mode-toggle">
+            <button class="mode-btn active" id="btn-mode-month" onclick="setMode('month')">📅 เดือน</button>
+            <button class="mode-btn" id="btn-mode-range" onclick="setMode('range')">📆 ช่วงวัน</button>
+          </div>
         </div>
-      </div>
-
-      <!-- เลือกเดือน -->
-      <div class="filter-group" id="group-month" style="min-width:150px">
-        <label>เดือน</label>
-        <div class="sel-wrap">
-          <select id="f-month">
-            <option value="">ทุกเดือน</option>
-            <option value="01">มกราคม</option>
-            <option value="02">กุมภาพันธ์</option>
-            <option value="03">มีนาคม</option>
-            <option value="04">เมษายน</option>
-            <option value="05">พฤษภาคม</option>
-            <option value="06">มิถุนายน</option>
-            <option value="07">กรกฎาคม</option>
-            <option value="08">สิงหาคม</option>
-            <option value="09">กันยายน</option>
-            <option value="10">ตุลาคม</option>
-            <option value="11">พฤศจิกายน</option>
-            <option value="12">ธันวาคม</option>
-          </select>
+        <div class="filter-group" id="group-month" style="min-width:150px">
+          <label>เดือน</label>
+          <div class="sel-wrap">
+            <select id="f-month">
+              <option value="">ทุกเดือน</option>
+              <option value="01">มกราคม</option><option value="02">กุมภาพันธ์</option>
+              <option value="03">มีนาคม</option><option value="04">เมษายน</option>
+              <option value="05">พฤษภาคม</option><option value="06">มิถุนายน</option>
+              <option value="07">กรกฎาคม</option><option value="08">สิงหาคม</option>
+              <option value="09">กันยายน</option><option value="10">ตุลาคม</option>
+              <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+            </select>
+          </div>
         </div>
-      </div>
-
-      <!-- ค้นหาชื่อ -->
-      <div class="filter-group" style="min-width:150px">
-        <label>ค้นหารายชื่อ</label>
-        <input type="text" id="f-search" placeholder="พิมพ์ชื่อ...">
-      </div>
-
-      <!-- ปุ่ม -->
-      <div class="filter-group" style="flex:0;min-width:auto">
-        <label>&nbsp;</label>
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="doSearch()">🔍 แสดงรายงาน</button>
-          <button class="btn btn-ghost" onclick="clearFilters()">✕ ล้าง</button>
-          <button class="btn btn-print" onclick="printReport()" id="btn-print" style="display:none">🖨️ พิมพ์ PDF</button>
+        <div id="group-range" style="display:none;flex:1;min-width:300px">
+          <div class="filter-row" style="gap:8px">
+            <div class="filter-group">
+              <label>วันที่เริ่มต้น</label>
+              <input type="date" id="f-date-from">
+            </div>
+            <div class="filter-group">
+              <label>วันที่สิ้นสุด</label>
+              <input type="date" id="f-date-to">
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ช่วงวันที่ (ซ่อนไว้ก่อน) -->
-    <div id="range-row" style="display:none">
-      <div class="filter-group" style="min-width:160px">
-        <div class="date-label">วันที่เริ่มต้น</div>
-        <div class="sel-wrap" style="--after-display:none">
-          <input type="date" id="f-date-from">
-        </div>
+    <!-- ② ประเภท -->
+    <div class="filter-section">
+      <div class="section-lbl">🗂️ ประเภทการจำหน่าย <span style="color:var(--text3);font-weight:400;font-size:.9em">(คลิกเลือก/ยกเลิก)</span></div>
+      <div class="type-checks" id="type-checks">
+        <!-- สร้างจาก JS -->
       </div>
-      <div class="filter-group" style="min-width:160px">
-        <div class="date-label">วันที่สิ้นสุด</div>
-        <div class="sel-wrap">
-          <input type="date" id="f-date-to">
+    </div>
+
+    <!-- ③ ค้นหารายชื่อ (เพิ่มหลายคน) -->
+    <div class="filter-section">
+      <div class="section-lbl">👤 เลือกรายชื่อ (ไม่ระบุ = ทุกคน)</div>
+      <div class="people-wrap">
+        <div class="people-search-row">
+          <div class="people-input-wrap" style="position:relative">
+            <input type="text" id="people-input" placeholder="พิมพ์ชื่อเพื่อค้นหา..." autocomplete="off"
+              oninput="onPeopleInput()" onkeydown="onPeopleKey(event)" onfocus="showDrop()">
+            <button class="people-clear-input" onclick="clearPeopleInput()" title="ล้าง">✕</button>
+            <div class="people-dropdown" id="people-dropdown"></div>
+          </div>
+          <button class="btn btn-ghost" onclick="clearPeople()" style="flex:0;white-space:nowrap">ล้างรายชื่อ</button>
         </div>
+        <div class="tags-wrap" id="people-tags"></div>
+        <div class="people-hint" id="people-hint">ยังไม่ได้เลือก — จะแสดงทุกคนในแผนกที่เลือก</div>
       </div>
+    </div>
+
+    <!-- ④ ปุ่ม -->
+    <div class="btn-row" style="margin-top:4px">
+      <button class="btn btn-primary" onclick="doSearch()">🔍 แสดงรายงาน</button>
+      <button class="btn btn-ghost" onclick="clearFilters()">✕ ล้างทั้งหมด</button>
+      <button class="btn btn-print" id="btn-pdf" style="display:none" onclick="printReport()">🖨️ พิมพ์ / PDF</button>
+      <button class="btn btn-excel" id="btn-excel" style="display:none" onclick="exportExcel()">📊 Export Excel</button>
     </div>
   </div>
 
-  <!-- Report -->
+  <!-- ═══ Report ═══ -->
   <div class="report-wrap">
     <div class="report-inner" id="report-inner">
       <div class="empty-state">
         <div class="ei">🗂️</div>
-        <p>กรุณาเลือก <strong>แผนก</strong> แล้วกด <strong>แสดงรายงาน</strong></p>
+        <p>กรุณาตั้งค่าตัวกรอง แล้วกด <strong>แสดงรายงาน</strong></p>
       </div>
     </div>
   </div>
-
 </div>
 
 <script>
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
-let allData = [];
+let allData   = [];
 let dataLoaded = false;
-let currentMode = 'month'; // 'month' | 'range'
+let currentMode = 'month';
+let selectedPeople = []; // รายชื่อที่เลือก (array of strings)
 
-const TH_M_FULL  = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TH_M_FULL  = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                    'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+                    'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const TYPE_ICON  = {'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌'};
-const TYPE_SUM   = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ'];
-const TYPE_CLS   = {'ลา':'sum-la','ศึกษา':'sum-study','ราชการ':'sum-gov','ล่วงเวลา':'sum-ot','เวร':'sum-duty','อื่นๆ':'sum-other'};
+const TYPE_ALL   = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ'];
+const TYPE_CLS   = {'ลา':'sum-la','ศึกษา':'sum-study','ราชการ':'sum-gov',
+                    'ล่วงเวลา':'sum-ot','เวร':'sum-duty','อื่นๆ':'sum-other'};
 
-function thDate(s) {
-  if (!s||s==='-') return '-';
-  s = String(s).trim();
+/* ── helpers ── */
+function thDate(s){
+  if(!s||s==='-') return '-'; s=String(s).trim();
   let y,m,d;
-  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) { const p=s.split('-'); y=+p[0]; m=+p[1]; d=+p[2]; }
-  else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) { const p=s.split('/'); d=+p[0]; m=+p[1]; y=+p[2]; }
+  if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)){const p=s.split('-');y=+p[0];m=+p[1];d=+p[2];}
+  else if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){const p=s.split('/');d=+p[0];m=+p[1];y=+p[2];}
   else return s;
-  if (!y||!m||!d||m<1||m>12||d<1||d>31) return '-';
+  if(!y||!m||!d||m<1||m>12||d<1||d>31) return '-';
   return `${d} ${TH_M_SHORT[m]} ${y+543}`;
 }
-function toISO(s) {
-  // returns yyyy-MM-dd or '' if invalid
-  if (!s||s==='-') return '';
-  s = String(s).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-    const p=s.split('/'); return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+function toISO(s){
+  if(!s||s==='-') return '';
+  s=String(s).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
+    const p=s.split('/');return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
   }
   return s;
 }
-function dayCount(a,b) {
-  if (!a||!b) return 1;
-  const da=new Date(a), db=new Date(b);
-  if (isNaN(da)||isNaN(db)) return 1;
+function dayCount(a,b){
+  if(!a||!b) return 1;
+  const da=new Date(a),db=new Date(b);
+  if(isNaN(da)||isNaN(db)) return 1;
   return Math.round((db-da)/86400000)+1;
 }
-function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function nowTH() {
-  const n=new Date(), d=n.getDate(), m=n.getMonth()+1, y=n.getFullYear()+543;
-  const hh=String(n.getHours()).padStart(2,'0'), mm2=String(n.getMinutes()).padStart(2,'0');
-  return `${d} ${TH_M_FULL[m]} ${y}  เวลา ${hh}:${mm2} น.`;
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function nowTH(){
+  const n=new Date(),d=n.getDate(),m=n.getMonth()+1,y=n.getFullYear()+543;
+  const hh=String(n.getHours()).padStart(2,'0'),mm=String(n.getMinutes()).padStart(2,'0');
+  return `${d} ${TH_M_FULL[m]} ${y}  เวลา ${hh}:${mm} น.`;
 }
 
-// ── Mode toggle ──
-function setMode(mode) {
+/* ── Build type checkboxes ── */
+function buildTypeChecks(){
+  const wrap = document.getElementById('type-checks');
+  wrap.innerHTML = '';
+  TYPE_ALL.forEach(t => {
+    const el = document.createElement('div');
+    el.className = `type-check chk-${t} on`;
+    el.dataset.type = t;
+    el.innerHTML = `${TYPE_ICON[t]||''} ${t}`;
+    el.onclick = () => { el.classList.toggle('on'); };
+    wrap.appendChild(el);
+  });
+}
+function getSelectedTypes(){
+  return [...document.querySelectorAll('.type-check.on')].map(el=>el.dataset.type);
+}
+
+/* ── Mode toggle ── */
+function setMode(mode){
   currentMode = mode;
   document.getElementById('btn-mode-month').classList.toggle('active', mode==='month');
   document.getElementById('btn-mode-range').classList.toggle('active', mode==='range');
-  document.getElementById('group-month').style.display = mode==='month' ? '' : 'none';
-  document.getElementById('range-row').style.display   = mode==='range' ? 'flex' : 'none';
+  document.getElementById('group-month').style.display = mode==='month'?'':'none';
+  document.getElementById('group-range').style.display = mode==='range'?'':'none';
 }
 
-// ── Init: load dept list only ──
-window.onload = async function() {
-  // set default month
-  document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
-  // set default date range = this month
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  const firstDay = `${y}-${String(m+1).padStart(2,'0')}-01`;
-  const lastDay  = new Date(y, m+1, 0);
-  document.getElementById('f-date-from').value = firstDay;
-  document.getElementById('f-date-to').value   = `${y}-${String(m+1).padStart(2,'0')}-${String(lastDay.getDate()).padStart(2,'0')}`;
+/* ── People picker ── */
+function getAllNames(){
+  return [...new Set(allData.map(r=>r.name).filter(Boolean))].sort();
+}
+function onPeopleInput(){
+  const q=(document.getElementById('people-input').value||'').trim().toLowerCase();
+  if(!q){hideDrop();return;}
+  const names = (dataLoaded?getAllNames():[]).filter(n=>n.toLowerCase().includes(q)).slice(0,20);
+  const dd = document.getElementById('people-dropdown');
+  if(!names.length){dd.innerHTML='<div class="pd-item" style="color:var(--text3)">ไม่พบรายชื่อ</div>';dd.classList.add('show');return;}
+  dd.innerHTML = names.map(n=>{
+    const sel = selectedPeople.includes(n);
+    return `<div class="pd-item${sel?' selected':''}" onclick="addPerson('${n.replace(/'/g,"\\'")}')">
+      ${sel?'✓ ':''}${esc(n)}
+    </div>`;
+  }).join('');
+  dd.classList.add('show');
+}
+function showDrop(){if(document.getElementById('people-input').value.trim()) onPeopleInput();}
+function hideDrop(){document.getElementById('people-dropdown').classList.remove('show');}
+function addPerson(name){
+  if(!selectedPeople.includes(name)) selectedPeople.push(name);
+  renderTags();
+  document.getElementById('people-input').value='';
+  hideDrop();
+}
+function removePerson(name){
+  selectedPeople=selectedPeople.filter(n=>n!==name);
+  renderTags();
+}
+function renderTags(){
+  const wrap=document.getElementById('people-tags');
+  const hint=document.getElementById('people-hint');
+  if(!selectedPeople.length){
+    wrap.innerHTML='';
+    hint.textContent='ยังไม่ได้เลือก — จะแสดงทุกคนในแผนกที่เลือก';
+    return;
+  }
+  wrap.innerHTML=selectedPeople.map(n=>
+    `<span class="person-tag">${esc(n)}<button onclick="removePerson('${n.replace(/'/g,"\\'")}')">✕</button></span>`
+  ).join('');
+  hint.textContent=`เลือกแล้ว ${selectedPeople.length} คน`;
+}
+function clearPeopleInput(){document.getElementById('people-input').value='';hideDrop();}
+function clearPeople(){selectedPeople=[];renderTags();}
+function onPeopleKey(e){if(e.key==='Escape') hideDrop();}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.people-input-wrap')) hideDrop();
+});
 
-  if (!API) return;
-  try {
-    let depts = [];
-    if (window.DataCache) {
-      const map = await DataCache.getDepts();
-      depts = Object.keys(map||{}).sort();
-    } else {
-      const res = await fetch(API+'?action=getDepts');
-      const map = await res.json()||{};
-      depts = Object.keys(map).sort();
-    }
-    const sel = document.getElementById('f-dept');
-    sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
-    depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`);
-  } catch(e) {}
+/* ── Init: load dept list only ── */
+window.onload = async function(){
+  buildTypeChecks();
+  document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
+  const now=new Date(),y=now.getFullYear(),m=now.getMonth();
+  const last=new Date(y,m+1,0);
+  document.getElementById('f-date-from').value=`${y}-${String(m+1).padStart(2,'0')}-01`;
+  document.getElementById('f-date-to').value=`${y}-${String(m+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`;
+  if(!API) return;
+  try{
+    let depts=[];
+    if(window.DataCache){const map=await DataCache.getDepts();depts=Object.keys(map||{}).sort();}
+    else{const map=await fetch(API+'?action=getDepts').then(r=>r.json())||{};depts=Object.keys(map).sort();}
+    const sel=document.getElementById('f-dept');
+    sel.innerHTML='<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
+    depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
+  }catch(e){}
 };
 
-// ── กดปุ่มแสดงรายงาน ── โหลด leaves ถ้ายังไม่มี แล้ว render
-async function doSearch() {
-  const dept = document.getElementById('f-dept').value;
-  if (!dept) {
-    alert('กรุณาเลือกแผนกก่อน');
-    document.getElementById('f-dept').focus();
+/* ── Load leaves on demand ── */
+async function doSearch(){
+  const dept=document.getElementById('f-dept').value;
+  if(!dept && !selectedPeople.length){
+    alert('กรุณาเลือกแผนก หรือระบุรายชื่ออย่างน้อย 1 คน');
     return;
   }
-  if (!dataLoaded) {
-    await loadData(false);
-  } else {
-    renderReport();
-  }
+  if(!dataLoaded){await loadData(false);}
+  else{renderReport();}
 }
 
-// ── โหลด leaves จาก API ครั้งเดียว แล้ว cache ไว้ใน allData ──
-async function loadData(force) {
-  if (!API) {
-    document.getElementById('report-inner').innerHTML =
-      '<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>';
+async function loadData(force){
+  if(!API){
+    document.getElementById('report-inner').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>';
     return;
   }
-  document.getElementById('report-inner').innerHTML =
+  document.getElementById('report-inner').innerHTML=
     '<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
-  try {
-    allData = window.DataCache
-      ? await DataCache.getLeaves(force)
-      : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
-    dataLoaded = true;
-    // เติม dropdown แผนกถ้ามีตัวใหม่จากข้อมูลจริง
-    const depts = [...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
-    const sel = document.getElementById('f-dept'); const cur = sel.value;
-    const existing = [...sel.options].map(o=>o.value).filter(v=>v&&v!=='ALL');
-    if (depts.some(d=>!existing.includes(d))) {
-      sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
-      depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`);
-      if (cur) sel.value = cur;
+  try{
+    allData=window.DataCache?await DataCache.getLeaves(force):
+      await fetch(API+'?action=getLeaves').then(r=>r.json())||[];
+    dataLoaded=true;
+    const depts=[...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
+    const sel=document.getElementById('f-dept');const cur=sel.value;
+    const existing=[...sel.options].map(o=>o.value).filter(v=>v&&v!=='ALL');
+    if(depts.some(d=>!existing.includes(d))){
+      sel.innerHTML='<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
+      depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+      if(cur) sel.value=cur;
     }
     renderReport();
-  } catch(e) {
-    document.getElementById('report-inner').innerHTML =
+  }catch(e){
+    document.getElementById('report-inner').innerHTML=
       `<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${esc(e.message)}</small></p></div>`;
   }
 }
 
-// ── กรองข้อมูลตาม filter ปัจจุบัน ──
-function filterRows() {
-  const dept       = document.getElementById('f-dept').value;
-  const deptFilter = dept === 'ALL' ? '' : dept;
-  const search     = (document.getElementById('f-search').value||'').trim().toLowerCase();
-  const month      = document.getElementById('f-month').value;
-  const dateFrom   = document.getElementById('f-date-from').value; // yyyy-MM-dd
-  const dateTo     = document.getElementById('f-date-to').value;
+/* ── Filter logic ── */
+function filterRows(){
+  const dept=document.getElementById('f-dept').value;
+  const deptFilter=dept==='ALL'?'':dept;
+  const month=document.getElementById('f-month').value;
+  const dateFrom=document.getElementById('f-date-from').value;
+  const dateTo=document.getElementById('f-date-to').value;
+  const selTypes=getSelectedTypes();
 
-  return allData.filter(r => {
-    if (deptFilter && r.dept !== deptFilter) return false;
-    if (search && !(r.name||'').toLowerCase().includes(search)) return false;
-
-    const rFrom = toISO(r.dateFrom);
-    const rTo   = toISO(r.dateTo || r.dateFrom);
-
-    if (currentMode === 'month' && month) {
-      // overlap: row ทับช่วงเดือนนั้น
-      if (!rFrom) return false;
-      const startDate = new Date(rFrom.slice(0,4), +rFrom.slice(5,7)-1, 1);
-      const endDate   = new Date(rTo.slice(0,4),   +rTo.slice(5,7)-1,   28);
-      let found = false;
-      for (let y = startDate.getFullYear(); y <= endDate.getFullYear()+1; y++) {
-        if (new Date(y, +month-1, 15) >= startDate && new Date(y, +month-1, 15) <= endDate) { found=true; break; }
+  return allData.filter(r=>{
+    // แผนก (ถ้ามีรายชื่อที่เลือกไว้ ข้ามตัวกรองแผนก)
+    if(!selectedPeople.length && deptFilter && r.dept!==deptFilter) return false;
+    // รายชื่อ
+    if(selectedPeople.length && !selectedPeople.includes(r.name)) return false;
+    // ประเภท
+    if(!selTypes.includes(r.leaveType)) return false;
+    // ช่วงเวลา
+    const rFrom=toISO(r.dateFrom), rTo=toISO(r.dateTo||r.dateFrom);
+    if(currentMode==='month' && month){
+      if(!rFrom) return false;
+      const sd=new Date(rFrom.slice(0,4),+rFrom.slice(5,7)-1,1);
+      const ed=new Date(rTo.slice(0,4),+rTo.slice(5,7)-1,28);
+      let found=false;
+      for(let y=sd.getFullYear();y<=ed.getFullYear()+1;y++){
+        if(new Date(y,+month-1,15)>=sd&&new Date(y,+month-1,15)<=ed){found=true;break;}
       }
-      if (!found) return false;
+      if(!found) return false;
     }
-
-    if (currentMode === 'range' && (dateFrom || dateTo)) {
-      if (!rFrom) return false;
-      // overlap: [rFrom, rTo] ∩ [dateFrom, dateTo] ≠ ∅
-      const a1 = dateFrom || '0000-00-00';
-      const b1 = dateTo   || '9999-99-99';
-      if (rTo < a1 || rFrom > b1) return false;
+    if(currentMode==='range'&&(dateFrom||dateTo)){
+      if(!rFrom) return false;
+      if(rTo<(dateFrom||'0000-00-00')||rFrom>(dateTo||'9999-99-99')) return false;
     }
-
     return true;
   });
 }
 
-// ── Render รายงาน ──
-function renderReport() {
-  const dept   = document.getElementById('f-dept').value;
-  const month  = document.getElementById('f-month').value;
-  const dateFrom = document.getElementById('f-date-from').value;
-  const dateTo   = document.getElementById('f-date-to').value;
-  const search   = (document.getElementById('f-search').value||'').trim();
-  const unitName = sessionStorage.getItem('unitName') || '';
+/* ── Render report (screen + print) ── */
+function renderReport(){
+  const dept=document.getElementById('f-dept').value;
+  const month=document.getElementById('f-month').value;
+  const dateFrom=document.getElementById('f-date-from').value;
+  const dateTo=document.getElementById('f-date-to').value;
+  const unitName=sessionStorage.getItem('unitName')||'';
+  const selTypes=getSelectedTypes();
 
-  const rows    = filterRows();
-  const indexed = rows.map((r,_)=>({r, idx:allData.indexOf(r)}));
-  indexed.sort((a,b) => b.idx - a.idx);
+  const rows=filterRows();
+  const indexed=rows.map((r,_)=>({r,idx:allData.indexOf(r)}));
+  indexed.sort((a,b)=>b.idx-a.idx);
 
   // subtitle
-  let subtitle = '';
-  if (dept && dept !== 'ALL') subtitle += `แผนก: ${dept}`;
-  else if (dept === 'ALL')    subtitle += 'ทุกแผนก';
-  if (currentMode === 'month' && month) {
-    subtitle += (subtitle?' | ':'') + `เดือน: ${TH_M_FULL[+month]}`;
-  } else if (currentMode === 'range' && (dateFrom || dateTo)) {
-    subtitle += (subtitle?' | ':'') + `${thDate(dateFrom)} – ${thDate(dateTo)}`;
-  }
-  if (search) subtitle += (subtitle?' | ':'') + `ค้นหา: "${search}"`;
-  if (!subtitle) subtitle = 'แสดงข้อมูลทั้งหมด';
+  let subtitle='';
+  if(selectedPeople.length) subtitle+=`รายชื่อที่เลือก: ${selectedPeople.join(', ')}`;
+  else if(dept&&dept!=='ALL') subtitle+=`แผนก: ${dept}`;
+  else if(dept==='ALL') subtitle+='ทุกแผนก';
+  if(currentMode==='month'&&month) subtitle+=(subtitle?' | ':'')+`เดือน: ${TH_M_FULL[+month]}`;
+  else if(currentMode==='range'&&(dateFrom||dateTo))
+    subtitle+=(subtitle?' | ':'')+`${thDate(dateFrom)} – ${thDate(dateTo)}`;
+  if(selTypes.length<TYPE_ALL.length)
+    subtitle+=(subtitle?' | ':'')+`ประเภท: ${selTypes.map(t=>TYPE_ICON[t]+t).join(' ')}`;
+  if(!subtitle) subtitle='แสดงข้อมูลทั้งหมด';
 
-  // summary
-  const sumCounts = {};
-  TYPE_SUM.forEach(t => sumCounts[t] = rows.filter(r=>r.leaveType===t).length);
+  const sumCounts={};
+  TYPE_ALL.forEach(t=>sumCounts[t]=rows.filter(r=>r.leaveType===t).length);
 
-  let html = `
+  let html=`
   <div class="rpt-header">
     <img src="logowing23.png" class="rpt-logo" alt="logo" onerror="this.style.display='none'">
     <div class="rpt-title-block">
@@ -469,30 +561,27 @@ function renderReport() {
       <div class="rpt-sub">${esc(subtitle)}</div>
     </div>
     <div class="rpt-meta">
-      <div>พิมพ์เมื่อ</div>
-      <div><strong>${nowTH()}</strong></div>
+      <div>พิมพ์เมื่อ</div><div><strong>${nowTH()}</strong></div>
       <div style="margin-top:4px">รวม <strong>${rows.length}</strong> รายการ</div>
     </div>
   </div>
   <div class="rpt-summary">
     <span class="sum-badge sum-total">📋 รวม ${rows.length} รายการ</span>`;
-  TYPE_SUM.forEach(t => {
-    if (sumCounts[t]>0) html += `<span class="sum-badge ${TYPE_CLS[t]}">${TYPE_ICON[t]||''} ${t} ${sumCounts[t]}</span>`;
-  });
-  html += '</div>';
+  TYPE_ALL.forEach(t=>{if(sumCounts[t]>0) html+=`<span class="sum-badge ${TYPE_CLS[t]}">${TYPE_ICON[t]||''} ${t} ${sumCounts[t]}</span>`;});
+  html+='</div>';
 
-  if (rows.length === 0) {
-    html += '<div class="empty-state"><div class="ei">📭</div><p>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</p></div>';
+  if(!rows.length){
+    html+='<div class="empty-state"><div class="ei">📭</div><p>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</p></div>';
   } else {
-    html += `<div class="rpt-table-wrap"><table>
+    html+=`<div class="rpt-table-wrap"><table>
       <thead><tr>
         <th style="width:32px">#</th>
         <th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th>
         <th>วันที่ไป</th><th>วันที่กลับ</th><th style="text-align:center">จำนวน</th>
       </tr></thead><tbody>`;
-    indexed.forEach(({r}, pos) => {
-      const days = dayCount(r.dateFrom, r.dateTo);
-      html += `<tr>
+    indexed.forEach(({r},pos)=>{
+      const days=dayCount(r.dateFrom,r.dateTo);
+      html+=`<tr>
         <td class="no-col">${pos+1}</td>
         <td style="font-weight:600">${esc(r.name||'-')}</td>
         <td><span class="dept-tag">${esc(r.dept||'-')}</span></td>
@@ -502,29 +591,108 @@ function renderReport() {
         <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
       </tr>`;
     });
-    html += '</tbody></table></div>';
+    html+='</tbody></table></div>';
   }
 
-  html += `<div class="rpt-footer">
+  // ── ข้อความรับรอง ──
+  html+=`
+  <div class="rpt-cert">
+    <p>ขอรับรองว่า รายชื่อตามเรื่องนี้ไม่มีการซ้ำซ้อนกันในการเบิก OT, ไปราชการอื่นๆ และศึกษา</p>
+    <div class="sig-line">
+      <div class="sig-block">
+        <div class="sig-dots">.....................................................</div>
+        <div>(.....................................................)</div>
+        <div style="margin-top:4px">วันที่&nbsp;&nbsp;............/............../...............</div>
+      </div>
+    </div>
+  </div>`;
+
+  html+=`<div class="rpt-footer">
     <div>รายงานนี้ผลิตโดยระบบบันทึกการจำหน่าย${unitName?' · '+unitName:''}</div>
     <div>พิมพ์เมื่อ ${nowTH()}</div>
   </div>`;
 
-  document.getElementById('report-inner').innerHTML = html;
-  document.getElementById('btn-print').style.display = '';
+  document.getElementById('report-inner').innerHTML=html;
+  document.getElementById('btn-pdf').style.display='';
+  document.getElementById('btn-excel').style.display='';
 }
 
-function clearFilters() {
-  document.getElementById('f-dept').value   = '';
-  document.getElementById('f-month').value  = String(new Date().getMonth()+1).padStart(2,'0');
-  document.getElementById('f-search').value = '';
+/* ── Export Excel ── */
+function exportExcel(){
+  const rows=filterRows();
+  if(!rows.length){alert('ไม่มีข้อมูลที่จะ export');return;}
+
+  const dept=document.getElementById('f-dept').value;
+  const month=document.getElementById('f-month').value;
+  const dateFrom=document.getElementById('f-date-from').value;
+  const dateTo=document.getElementById('f-date-to').value;
+  const unitName=sessionStorage.getItem('unitName')||'';
+
+  // sort newest first
+  const indexed=rows.map((r,_)=>({r,idx:allData.indexOf(r)}));
+  indexed.sort((a,b)=>b.idx-a.idx);
+
+  const headers=['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน'];
+  const data=indexed.map(({r},i)=>[
+    i+1, r.name||'-', r.dept||'-', r.leaveType||'-',
+    thDate(r.dateFrom), thDate(r.dateTo), dayCount(r.dateFrom,r.dateTo)
+  ]);
+
+  // title rows
+  const titleRows=[
+    [unitName||'ระบบบันทึกการจำหน่าย'],
+    ['รายงานสถานะการจำหน่ายกำลังพล'],
+  ];
+  if(dept) titleRows.push([`แผนก: ${dept==='ALL'?'ทุกแผนก':dept}`]);
+  if(currentMode==='month'&&month) titleRows.push([`เดือน: ${TH_M_FULL[+month]}`]);
+  if(currentMode==='range'&&(dateFrom||dateTo)) titleRows.push([`ช่วง: ${thDate(dateFrom)} – ${thDate(dateTo)}`]);
+  titleRows.push([`พิมพ์เมื่อ: ${nowTH()}`],['']);
+
+  const wb=XLSX.utils.book_new();
+  const wsData=[...titleRows, headers, ...data];
+  wsData.push([]);
+  wsData.push(['ขอรับรองว่า รายชื่อตามเรื่องนี้ไม่มีการซ้ำซ้อนกันในการเบิก OT, ไปราชการอื่นๆ และศึกษา']);
+  wsData.push([]);
+  wsData.push(['ลงชื่อ ......................................']);
+  wsData.push(['       (.....................................)']);
+  wsData.push(['วันที่ ........./........./..........']);
+
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+
+  // column widths
+  ws['!cols']=[{wch:5},{wch:28},{wch:14},{wch:12},{wch:16},{wch:16},{wch:10}];
+
+  // style header row (row index = titleRows.length)
+  const hdrRow=titleRows.length;
+  headers.forEach((_,ci)=>{
+    const cell=XLSX.utils.encode_cell({r:hdrRow,c:ci});
+    if(ws[cell]) ws[cell].s={font:{bold:true},fill:{fgColor:{rgb:'EEF1F8'}}};
+  });
+
+  XLSX.utils.book_append_sheet(wb,ws,'รายงานจำหน่าย');
+
+  // filename
+  let fname='รายงานจำหน่าย';
+  if(dept&&dept!=='ALL') fname+=`_${dept}`;
+  if(currentMode==='month'&&month) fname+=`_${TH_M_FULL[+month]}`;
+  else if(currentMode==='range'&&dateFrom) fname+=`_${dateFrom}`;
+  XLSX.writeFile(wb,`${fname}.xlsx`);
+}
+
+function clearFilters(){
+  document.getElementById('f-dept').value='';
+  document.getElementById('f-month').value=String(new Date().getMonth()+1).padStart(2,'0');
+  document.getElementById('f-search') && (document.getElementById('f-search').value='');
+  selectedPeople=[];renderTags();
+  buildTypeChecks();
   setMode('month');
-  document.getElementById('btn-print').style.display = 'none';
-  document.getElementById('report-inner').innerHTML =
-    '<div class="empty-state"><div class="ei">🗂️</div><p>กรุณาเลือก <strong>แผนก</strong> แล้วกด <strong>แสดงรายงาน</strong></p></div>';
+  document.getElementById('btn-pdf').style.display='none';
+  document.getElementById('btn-excel').style.display='none';
+  document.getElementById('report-inner').innerHTML=
+    '<div class="empty-state"><div class="ei">🗂️</div><p>กรุณาตั้งค่าตัวกรอง แล้วกด <strong>แสดงรายงาน</strong></p></div>';
 }
 
-function printReport() { window.print(); }
+function printReport(){window.print();}
 </script>
 </body>
 </html>
