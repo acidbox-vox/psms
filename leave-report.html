@@ -155,6 +155,13 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 .days-pill{display:inline-block;padding:1px 7px;border-radius:5px;background:var(--bg);
   font-size:.85em;color:var(--text3);font-weight:700;border:1px solid var(--border)}
 .no-col{color:var(--text3);font-size:.85em}
+.note-cell:empty::before{content:attr(data-placeholder);color:var(--text3)}
+.note-cell:focus{background:rgba(59,124,244,.04);border-radius:4px;
+  box-shadow:inset 0 0 0 1.5px rgba(59,124,244,.25)}
+@media print{
+  .note-cell{border-bottom:1px solid #ccc;min-width:100px}
+  .note-cell:empty::before{content:''}
+}
 
 /* Certification */
 .rpt-cert{margin-top:32px;padding:20px 24px;border:1.5px dashed var(--border);
@@ -173,6 +180,30 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 .spinner{width:15px;height:15px;border:2px solid rgba(59,124,244,.2);border-top-color:var(--blue);
   border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+.badge-117{
+  padding:6px 14px;border-radius:20px;font-size:.82em;font-weight:800;
+  background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;
+  letter-spacing:.05em;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+
+/* Progress bar */
+.load-progress-wrap{padding:28px 36px;text-align:center}
+.load-title{font-size:.9em;font-weight:700;color:var(--text);margin-bottom:6px}
+.load-sub{font-size:.78em;color:var(--text3);margin-bottom:14px}
+.progress-track{height:10px;background:var(--bg2);border-radius:99px;overflow:hidden;margin:0 auto;max-width:360px}
+.progress-bar{height:100%;background:linear-gradient(90deg,#3b7cf4,#10b981);border-radius:99px;
+  transition:width .3s ease;width:0%}
+.progress-pct{font-size:1.1em;font-weight:800;color:var(--blue);margin-top:8px}
+.load-step{font-size:.75em;color:var(--text3);margin-top:5px;min-height:18px}
+
+/* People status chip */
+.people-status{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+  border-radius:20px;font-size:.76em;font-weight:700;margin-top:3px}
+.pst-loading{background:rgba(59,124,244,.08);color:var(--blue);border:1px solid rgba(59,124,244,.2)}
+.pst-ready{background:rgba(5,150,105,.08);color:#059669;border:1px solid rgba(5,150,105,.2)}
+.pst-empty{background:var(--bg2);color:var(--text3);border:1px solid var(--border)}
+.pst-spinner{width:10px;height:10px;border:1.5px solid rgba(59,124,244,.2);border-top-color:var(--blue);
+  border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
 
 /* ── PRINT ── */
 @media print{
@@ -206,6 +237,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 <div class="topbar no-print">
   <a href="leave-status.html" class="back-btn">← สถานะจำหน่าย</a>
   <span class="page-title">🖨️ รายงานสถานะจำหน่าย</span>
+  <div class="badge-117">🕐 11-7</div>
 </div>
 
 <div class="wrap">
@@ -285,6 +317,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
         </div>
         <div class="tags-wrap" id="people-tags"></div>
         <div class="people-hint" id="people-hint">ยังไม่ได้เลือก — จะแสดงทุกคนในแผนกที่เลือก</div>
+        <div class="people-status pst-empty" id="people-status">⏳ กด "แสดงรายงาน" เพื่อโหลดข้อมูลก่อนค้นหาชื่อ</div>
       </div>
     </div>
 
@@ -389,7 +422,12 @@ function getAllNames(){
 function onPeopleInput(){
   const q=(document.getElementById('people-input').value||'').trim().toLowerCase();
   if(!q){hideDrop();return;}
-  const names = (dataLoaded?getAllNames():[]).filter(n=>n.toLowerCase().includes(q)).slice(0,20);
+  if(!dataLoaded){
+    const dd=document.getElementById('people-dropdown');
+    dd.innerHTML='<div class="pd-item" style="color:var(--blue)"><span style="font-size:11px">⚠️</span> กด "แสดงรายงาน" เพื่อโหลดข้อมูลก่อน จึงจะค้นหาชื่อได้</div>';
+    dd.classList.add('show');return;
+  }
+  const names = getAllNames().filter(n=>n.toLowerCase().includes(q)).slice(0,20);
   const dd = document.getElementById('people-dropdown');
   if(!names.length){dd.innerHTML='<div class="pd-item" style="color:var(--text3)">ไม่พบรายชื่อ</div>';dd.classList.add('show');return;}
   dd.innerHTML = names.map(n=>{
@@ -449,6 +487,17 @@ window.onload = async function(){
     sel.innerHTML='<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
     depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
   }catch(e){}
+  // ถ้า cache leaves มีอยู่แล้ว บอกผู้ใช้ว่าพร้อมค้นหา
+  try{
+    const cached=sessionStorage.getItem('cache_leaves');
+    if(cached){
+      const obj=JSON.parse(cached);
+      if(Date.now()-obj.ts < 3*60*1000){
+        allData=obj.data||[]; dataLoaded=true;
+        setPeopleStatus('ready',`✅ มีข้อมูลใน cache — พร้อมค้นหา ${allData.length} รายการ`);
+      }
+    }
+  }catch(e){}
 };
 
 /* ── Load leaves on demand ── */
@@ -462,17 +511,107 @@ async function doSearch(){
   else{renderReport();}
 }
 
+/* ── Progress helpers ── */
+function showProgress(pct, step){
+  document.getElementById('report-inner').innerHTML=`
+    <div class="load-progress-wrap">
+      <div class="load-title">📡 กำลังโหลดข้อมูล...</div>
+      <div class="load-sub">โหลดครั้งแรกอาจใช้เวลาสักครู่</div>
+      <div class="progress-track"><div class="progress-bar" id="prog-bar" style="width:${pct}%"></div></div>
+      <div class="progress-pct">${pct}%</div>
+      <div class="load-step" id="prog-step">${step||''}</div>
+    </div>`;
+}
+function updateProgress(pct, step){
+  const bar=document.getElementById('prog-bar');
+  const stepEl=document.getElementById('prog-step');
+  if(bar) bar.style.width=pct+'%';
+  if(stepEl && step) stepEl.textContent=step;
+  const pctEl=document.getElementById('report-inner').querySelector('.progress-pct');
+  if(pctEl) pctEl.textContent=pct+'%';
+}
+function setPeopleStatus(state, text){
+  const el=document.getElementById('people-status');
+  if(!el) return;
+  el.className='people-status';
+  if(state==='loading') el.classList.add('pst-loading');
+  else if(state==='ready') el.classList.add('pst-ready');
+  else el.classList.add('pst-empty');
+  el.innerHTML = state==='loading'
+    ? `<span class="pst-spinner"></span> ${text}`
+    : text;
+}
+
 async function loadData(force){
   if(!API){
     document.getElementById('report-inner').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>';
     return;
   }
-  document.getElementById('report-inner').innerHTML=
-    '<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
+
+  // ถ้า DataCache มีข้อมูลอยู่แล้ว (cache hit) — แสดง progress แบบเร็ว
+  const cached = !force && window.sessionStorage && sessionStorage.getItem('cache_leaves');
+  if(cached){
+    showProgress(30,'📦 อ่านจาก cache...');
+    setPeopleStatus('loading','กำลังเตรียมข้อมูล...');
+    await new Promise(r=>setTimeout(r,80));
+    updateProgress(80,'✅ โหลดจาก cache สำเร็จ');
+    await new Promise(r=>setTimeout(r,120));
+  } else {
+    showProgress(5,'🌐 กำลังเชื่อมต่อ GAS...');
+    setPeopleStatus('loading','กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...');
+  }
+
   try{
-    allData=window.DataCache?await DataCache.getLeaves(force):
-      await fetch(API+'?action=getLeaves').then(r=>r.json())||[];
+    let data;
+    if(window.DataCache && cached){
+      data = await DataCache.getLeaves(force);
+      updateProgress(95,'🔄 ประมวลผล...');
+    } else {
+      // Fetch with Content-Length progress if available
+      updateProgress(10,'📡 ดึงข้อมูลจาก Google Apps Script...');
+      const resp = await fetch((window.DataCache?GAS_API_URL:API)+'?action=getLeaves');
+      const contentLength = resp.headers.get('Content-Length');
+      if(contentLength){
+        const total = +contentLength;
+        const reader = resp.body.getReader();
+        let received = 0; const chunks = [];
+        while(true){
+          const {done,value} = await reader.read();
+          if(done) break;
+          chunks.push(value); received+=value.length;
+          const pct = Math.min(85, 10 + Math.round((received/total)*75));
+          updateProgress(pct, `📥 รับข้อมูล ${(received/1024).toFixed(0)} KB...`);
+        }
+        updateProgress(88,'🔄 แปลงข้อมูล...');
+        const text = new TextDecoder().decode(
+          chunks.reduce((a,b)=>{ const c=new Uint8Array(a.length+b.length); c.set(a);c.set(b,a.length);return c;},
+          new Uint8Array(0)));
+        data = JSON.parse(text)||[];
+        if(window.DataCache) sessionStorage.setItem('cache_leaves',JSON.stringify({ts:Date.now(),data}));
+      } else {
+        // No Content-Length — fake incremental progress
+        updateProgress(15,'📡 รอการตอบกลับ...');
+        const timer = setInterval(()=>{
+          const bar=document.getElementById('prog-bar');
+          if(!bar){clearInterval(timer);return;}
+          const cur=parseFloat(bar.style.width)||15;
+          if(cur<82) { bar.style.width=(cur+2)+'%';
+            const pctEl=document.getElementById('report-inner').querySelector('.progress-pct');
+            if(pctEl) pctEl.textContent=Math.round(cur+2)+'%'; }
+        },400);
+        try{
+          data = window.DataCache ? await DataCache.getLeaves(force)
+            : await resp.json()||[];
+        }finally{ clearInterval(timer); }
+        updateProgress(88,'🔄 ประมวลผล...');
+      }
+    }
+    await new Promise(r=>setTimeout(r,100));
+    updateProgress(95,'🗂️ เตรียมรายชื่อ...');
+    allData = data || [];
     dataLoaded=true;
+
+    // sync dept dropdown
     const depts=[...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
     const sel=document.getElementById('f-dept');const cur=sel.value;
     const existing=[...sel.options].map(o=>o.value).filter(v=>v&&v!=='ALL');
@@ -481,8 +620,13 @@ async function loadData(force){
       depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
       if(cur) sel.value=cur;
     }
+
+    updateProgress(100,'✅ โหลดสำเร็จ '+allData.length+' รายการ');
+    setPeopleStatus('ready',`✅ พร้อมค้นหา — มีข้อมูล ${allData.length} รายการ`);
+    await new Promise(r=>setTimeout(r,400));
     renderReport();
   }catch(e){
+    setPeopleStatus('empty','❌ โหลดไม่สำเร็จ');
     document.getElementById('report-inner').innerHTML=
       `<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${esc(e.message)}</small></p></div>`;
   }
@@ -577,7 +721,7 @@ function renderReport(){
       <thead><tr>
         <th style="width:32px">#</th>
         <th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th>
-        <th>วันที่ไป</th><th>วันที่กลับ</th><th style="text-align:center">จำนวน</th>
+        <th>วันที่ไป</th><th>วันที่กลับ</th><th style="text-align:center">จำนวน</th><th style="min-width:120px">หมายเหตุ</th>
       </tr></thead><tbody>`;
     indexed.forEach(({r},pos)=>{
       const days=dayCount(r.dateFrom,r.dateTo);
@@ -589,6 +733,9 @@ function renderReport(){
         <td style="white-space:nowrap">${thDate(r.dateFrom)}</td>
         <td style="white-space:nowrap">${thDate(r.dateTo)}</td>
         <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
+        <td class="note-cell" contenteditable="true" data-placeholder="—" 
+            style="min-width:120px;outline:none;color:var(--text2);font-size:.85em;cursor:text"
+            onclick="this.focus()"></td>
       </tr>`;
     });
     html+='</tbody></table></div>';
@@ -632,10 +779,13 @@ function exportExcel(){
   const indexed=rows.map((r,_)=>({r,idx:allData.indexOf(r)}));
   indexed.sort((a,b)=>b.idx-a.idx);
 
-  const headers=['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน'];
+  const headers=['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน','หมายเหตุ'];
+  // collect note cells from DOM
+  const noteCells=[...document.querySelectorAll('.note-cell')];
   const data=indexed.map(({r},i)=>[
     i+1, r.name||'-', r.dept||'-', r.leaveType||'-',
-    thDate(r.dateFrom), thDate(r.dateTo), dayCount(r.dateFrom,r.dateTo)
+    thDate(r.dateFrom), thDate(r.dateTo), dayCount(r.dateFrom,r.dateTo),
+    noteCells[i]?noteCells[i].innerText.trim():''
   ]);
 
   // title rows
@@ -660,7 +810,7 @@ function exportExcel(){
   const ws=XLSX.utils.aoa_to_sheet(wsData);
 
   // column widths
-  ws['!cols']=[{wch:5},{wch:28},{wch:14},{wch:12},{wch:16},{wch:16},{wch:10}];
+  ws['!cols']=[{wch:5},{wch:28},{wch:14},{wch:12},{wch:16},{wch:16},{wch:10},{wch:22}];
 
   // style header row (row index = titleRows.length)
   const hdrRow=titleRows.length;
