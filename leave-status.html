@@ -509,7 +509,14 @@ function clearFilters() {
   showPrompt();
 }
 function openReport(mode) {
-  window.location.href = 'leave-report.html?mode=' + (mode||'normal');
+  const dept   = document.getElementById('f-dept').value;
+  const month  = document.getElementById('f-month').value;
+  const search = (document.getElementById('f-search').value||'').trim();
+  const params = new URLSearchParams({ mode: mode||'normal' });
+  if (dept)   params.set('dept',   dept);
+  if (month)  params.set('month',  month);
+  if (search) params.set('search', search);
+  window.location.href = 'leave-report.html?' + params.toString();
 }
 </script>
 
