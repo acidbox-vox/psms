@@ -175,9 +175,25 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 /* Certification */
 .rpt-info-bar{
   background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;
-  padding:7px 14px;margin-bottom:10px;font-size:.82em;font-weight:700;color:var(--text2);
-  display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  padding:10px 14px;margin-bottom:10px;font-size:.82em;font-weight:700;color:var(--text2);
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center;
   -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.info-117-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:4px}
+.info-117-label{font-size:.82em;font-weight:700;color:var(--text2);white-space:nowrap}
+.pill-117{
+  display:inline-block;min-width:90px;padding:4px 14px;
+  border:1.5px solid var(--border);border-radius:99px;
+  background:#fff;color:var(--text);font-size:.82em;font-family:'Sarabun',sans-serif;
+  outline:none;text-align:center;cursor:text;transition:border-color .15s,box-shadow .15s}
+.pill-117:focus{border-color:rgba(59,124,244,.5);box-shadow:0 0 0 3px rgba(59,124,244,.08)}
+.pill-117:empty::before{content:'กรอก 11-7';color:var(--text3);font-style:italic;font-size:.9em}
+/* พิมพ์: ซ่อนกล่องที่ว่าง */
+@media print{
+  .info-117-hint{display:none!important}
+  .pill-117:empty{display:none!important}
+  .pill-117{border:none;border-bottom:1px solid #aaa;border-radius:0;min-width:60px;
+    padding:2px 8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 .rpt-cert{margin-top:32px;padding:20px 24px 20px 0;display:flex;flex-direction:column;align-items:flex-end;text-align:left}
 .rpt-cert p{font-size:.88em;line-height:1.9;color:var(--text);max-width:560px}
 .rpt-cert .sig-line{margin-top:16px;display:flex;align-items:flex-end;gap:32px;flex-wrap:wrap}
@@ -774,7 +790,21 @@ function renderReport(){
     const infoLines = [];
     if(!multiDept && uniqueDepts.length===1) infoLines.push(`หน่วย: ${uniqueDepts[0]}`);
     if(!multiType && uniqueTypes.length===1) infoLines.push(`ประเภทการจำหน่าย: ${TYPE_ICON[uniqueTypes[0]]||''} ${uniqueTypes[0]}`);
-    if(infoLines.length) html+=`<div class="rpt-info-bar">${infoLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;')}</div>`;
+    {
+      const infoText = infoLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;');
+      html+=`<div class="rpt-info-bar">
+        ${infoText?`<span>${infoText}</span><span style="color:var(--border)">|</span>`:''}
+        <div class="info-117-wrap">
+          <span class="info-117-label">🔢 11-7 เลขที่</span>
+          <div class="pill-117" contenteditable="true" id="p117-1"></div>
+          <div class="pill-117" contenteditable="true" id="p117-2"></div>
+          <div class="pill-117" contenteditable="true" id="p117-3"></div>
+          <div class="pill-117" contenteditable="true" id="p117-4"></div>
+          <div class="pill-117" contenteditable="true" id="p117-5"></div>
+          <span class="info-117-hint no-print" style="font-size:.72em;color:var(--text3);font-weight:400">(กรอกก่อนพิมพ์)</span>
+        </div>
+      </div>`;
+    }
     html+=`<div class="rpt-table-wrap"><table>
       <thead><tr>
         <th style="width:32px;text-align:center">#</th>
@@ -784,7 +814,6 @@ function renderReport(){
         <th style="text-align:center">วันที่ไป</th>
         <th style="text-align:center">วันที่กลับ</th>
         <th style="text-align:center">จำนวน</th>
-        <th style="text-align:center;min-width:130px">11-7 เลขที่</th>
       </tr></thead><tbody>`;
     sorted.forEach((r,pos)=>{
       const days=dayCount(r.dateFrom,r.dateTo);
@@ -796,14 +825,6 @@ function renderReport(){
         <td style="white-space:nowrap;text-align:center">${thDate(r.dateFrom)}</td>
         <td style="white-space:nowrap;text-align:center">${thDate(r.dateTo)}</td>
         <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
-        <td style="min-width:130px;padding:0">
-          <div class="note-cell-wrap">
-            <div class="note-cell" contenteditable="true" data-placeholder="กรอก 11-7 เลขที่"
-              style="padding:8px 12px;outline:none;color:var(--text2);font-size:.85em;cursor:text;min-height:34px"
-              onclick="this.focus()"></div>
-            <div class="note-hint no-print">กรุณากรอกหมายเลข 11-7 ก่อนทำการพิมพ์รับรอง</div>
-          </div>
-        </td>
       </tr>`;
     });
     html+='</tbody></table></div>';
@@ -863,7 +884,21 @@ function renderReport(){
     const gInfoLines   = [];
     if(!gMultiDept && gUniqueDepts.length===1) gInfoLines.push(`หน่วย: ${gUniqueDepts[0]}`);
     if(!gMultiType && gUniqueTypes.length===1) gInfoLines.push(`ประเภทการจำหน่าย: ${TYPE_ICON[gUniqueTypes[0]]||''} ${gUniqueTypes[0]}`);
-    if(gInfoLines.length) html+=`<div class="rpt-info-bar">${gInfoLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;')}</div>`;
+    {
+      const gInfoText = gInfoLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;');
+      html+=`<div class="rpt-info-bar">
+        ${gInfoText?`<span>${gInfoText}</span><span style="color:var(--border)">|</span>`:''}
+        <div class="info-117-wrap">
+          <span class="info-117-label">🔢 11-7 เลขที่</span>
+          <div class="pill-117" contenteditable="true" id="p117-1"></div>
+          <div class="pill-117" contenteditable="true" id="p117-2"></div>
+          <div class="pill-117" contenteditable="true" id="p117-3"></div>
+          <div class="pill-117" contenteditable="true" id="p117-4"></div>
+          <div class="pill-117" contenteditable="true" id="p117-5"></div>
+          <span class="info-117-hint no-print" style="font-size:.72em;color:var(--text3);font-weight:400">(กรอกก่อนพิมพ์)</span>
+        </div>
+      </div>`;
+    }
     html+=`<div class="rpt-table-wrap"><table>
       <thead><tr>
         <th style="width:32px;text-align:center">#</th>
@@ -872,7 +907,6 @@ function renderReport(){
         ${gMultiType?'<th style="text-align:center">ประเภท</th>':''}
         <th style="text-align:center">วันที่จำหน่าย</th>
         <th style="text-align:center">รวม</th>
-        <th style="text-align:center;min-width:130px">11-7 เลขที่</th>
       </tr></thead><tbody>`;
     grouped.forEach((g,pos)=>{
       const dates = expandDates(g.ranges);
@@ -889,14 +923,6 @@ function renderReport(){
         ${gMultiType?`<td><span class="badge b-${esc(g.leaveType)}">${TYPE_ICON[g.leaveType]||''} ${esc(g.leaveType)}</span></td>`:''}
         <td style="font-size:.83em;color:var(--text2)">${esc(dateLabel)}</td>
         <td style="text-align:center"><span class="days-pill">${dates.length} วัน</span></td>
-        <td style="min-width:130px;padding:0">
-          <div class="note-cell-wrap">
-            <div class="note-cell" contenteditable="true" data-placeholder="กรอก 11-7 เลขที่"
-              style="padding:8px 12px;outline:none;color:var(--text2);font-size:.85em;cursor:text;min-height:34px"
-              onclick="this.focus()"></div>
-            <div class="note-hint no-print">กรุณากรอกหมายเลข 11-7 ก่อนทำการพิมพ์รับรอง</div>
-          </div>
-        </td>
       </tr>`;
     });
     html+='</tbody></table></div>';
@@ -943,9 +969,11 @@ function exportExcel(){
 
   const isGrouped = reportMode === 'grouped';
   const headers = isGrouped
-    ? ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่จำหน่าย','รวม','11-7 เลขที่']
-    : ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน','11-7 เลขที่'];
-  const noteCells=[...document.querySelectorAll('.note-cell')];
+    ? ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่จำหน่าย','รวม']
+    : ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน'];
+  // collect 11-7 pills
+  const pills117=[...document.querySelectorAll('.pill-117')].map(el=>el.innerText.trim()).filter(Boolean);
+  const pill117Str = pills117.length ? '11-7 เลขที่: '+pills117.join(', ') : '';
   let data=[];
 
   if(isGrouped){
@@ -960,10 +988,10 @@ function exportExcel(){
     exGrp.sort((a,b)=>a.name.localeCompare(b.name,'th')||a.leaveType.localeCompare(b.leaveType,'th'));
     function exExp(ranges){const set=new Set();ranges.forEach(({from,to})=>{if(!from)return;let cur=new Date(from);const end=new Date(to||from);while(cur<=end){set.add(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}});return[...set].sort();}
     function exFmt(dates){if(!dates.length)return'-';const nums=dates.map(d=>+d.slice(8,10));const parts=[];let s=nums[0],p=nums[0];for(let i=1;i<nums.length;i++){if(nums[i]===p+1){p=nums[i];}else{parts.push(s===p?`${s}`:`${s}–${p}`);s=p=nums[i];}}parts.push(s===p?`${s}`:`${s}–${p}`);const THS=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const m=+dates[0].slice(5,7),y=+dates[0].slice(0,4);return`วันที่ ${parts.join(', ')} ${THS[m]} ${y+543}`;}
-    data=exGrp.map((g,i)=>[i+1,g.name,g.dept,g.leaveType,exFmt(exExp(g.ranges)),exExp(g.ranges).length+' วัน',noteCells[i]?noteCells[i].innerText.trim():'']);
+    data=exGrp.map((g,i)=>[i+1,g.name,g.dept,g.leaveType,exFmt(exExp(g.ranges)),exExp(g.ranges).length+' วัน']);
   } else {
     const sorted=[...rows].sort((a,b)=>(a.name||'').localeCompare(b.name||'','th'));
-    data=sorted.map((r,i)=>[i+1,r.name||'-',r.dept||'-',r.leaveType||'-',thDate(r.dateFrom),thDate(r.dateTo),dayCount(r.dateFrom,r.dateTo)+' วัน',noteCells[i]?noteCells[i].innerText.trim():'']);
+    data=sorted.map((r,i)=>[i+1,r.name||'-',r.dept||'-',r.leaveType||'-',thDate(r.dateFrom),thDate(r.dateTo),dayCount(r.dateFrom,r.dateTo)+' วัน']);
   }
 
   // title rows
@@ -974,6 +1002,7 @@ function exportExcel(){
   if(dept) titleRows.push([`แผนก: ${dept==='ALL'?'ทุกแผนก':dept}`]);
   if(currentMode==='month'&&month) titleRows.push([`เดือน: ${TH_M_FULL[+month]}`]);
   if(currentMode==='range'&&(dateFrom||dateTo)) titleRows.push([`ช่วง: ${thDate(dateFrom)} – ${thDate(dateTo)}`]);
+  if(pill117Str) titleRows.push([pill117Str]);
   titleRows.push([`พิมพ์เมื่อ: ${nowTH()}`],['']);
 
   const wb=XLSX.utils.book_new();
@@ -989,7 +1018,7 @@ function exportExcel(){
   const ws=XLSX.utils.aoa_to_sheet(wsData);
 
   // column widths
-  ws['!cols']=isGrouped?[{wch:5},{wch:28},{wch:14},{wch:12},{wch:36},{wch:10},{wch:22}]:[{wch:5},{wch:28},{wch:14},{wch:12},{wch:16},{wch:16},{wch:10},{wch:22}];
+  ws['!cols']=isGrouped?[{wch:5},{wch:28},{wch:14},{wch:12},{wch:36},{wch:10}]:[{wch:5},{wch:28},{wch:14},{wch:12},{wch:16},{wch:16},{wch:10}];
 
   // style header row (row index = titleRows.length)
   const hdrRow=titleRows.length;
