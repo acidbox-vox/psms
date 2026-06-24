@@ -243,6 +243,15 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
   <div class="filter-card no-print">
     <div class="filter-title">⚙️ ตั้งค่าการรายงาน</div>
 
+    <!-- รูปแบบรายงาน -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border)">
+      <span style="font-size:.75em;font-weight:700;color:var(--text2);white-space:nowrap">📄 รูปแบบ</span>
+      <div class="mode-toggle" style="max-width:300px">
+        <button class="mode-btn active" id="btn-rmode-normal"  onclick="setReportMode('normal')">📋 ปกติ (ทุกรายการ)</button>
+        <button class="mode-btn"        id="btn-rmode-grouped" onclick="setReportMode('grouped')">🗂️ จัดระเบียบ (รวมชื่อ+วัน)</button>
+      </div>
+    </div>
+
     <!-- ① แผนก + ช่วงเวลา -->
     <div class="filter-section">
       <div class="section-lbl">🏢 แผนก &amp; ช่วงเวลา</div>
@@ -468,6 +477,14 @@ document.addEventListener('click',e=>{
 });
 
 /* ── Init: load dept list only ── */
+/* ── Report mode ── */
+function setReportMode(mode){
+  reportMode = mode;
+  document.getElementById('btn-rmode-normal').classList.toggle('active',  mode==='normal');
+  document.getElementById('btn-rmode-grouped').classList.toggle('active', mode==='grouped');
+  if(dataLoaded) renderReport();
+}
+
 window.onload = async function(){
   buildTypeChecks();
   document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
@@ -484,6 +501,10 @@ window.onload = async function(){
     sel.innerHTML='<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
     depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
   }catch(e){}
+  // อ่าน mode จาก URL param (?mode=grouped)
+  const urlMode = new URLSearchParams(window.location.search).get('mode');
+  if(urlMode === 'grouped') setReportMode('grouped');
+
   // ถ้า cache leaves มีอยู่แล้ว บอกผู้ใช้ว่าพร้อมค้นหา
   try{
     const cached=sessionStorage.getItem('cache_leaves');
@@ -704,7 +725,6 @@ function renderReport(){
     <div class="rpt-meta">
       <div>พิมพ์เมื่อ</div><div><strong>${nowTH()}</strong></div>
       <div style="margin-top:4px">รวม <strong>${rows.length}</strong> รายการ</div>
-      <div style="margin-top:8px"><span style="display:inline-block;padding:3px 12px;border-radius:20px;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;font-size:.78em;font-weight:800;letter-spacing:.06em;-webkit-print-color-adjust:exact;print-color-adjust:exact">🕐 11-7</span></div>
     </div>
   </div>
   <div class="rpt-summary">
@@ -714,14 +734,16 @@ function renderReport(){
 
   if(!rows.length){
     html+='<div class="empty-state"><div class="ei">📭</div><p>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</p></div>';
-  } else {
+  } else if(reportMode === 'normal'){
+    // ══ โหมดปกติ: แสดงทุกรายการ ══
+    const sorted = [...rows].sort((a,b)=>(a.name||'').localeCompare(b.name||'','th'));
     html+=`<div class="rpt-table-wrap"><table>
       <thead><tr>
         <th style="width:32px">#</th>
         <th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th>
         <th>วันที่ไป</th><th>วันที่กลับ</th><th style="text-align:center">จำนวน</th><th style="min-width:120px">หมายเหตุ</th>
       </tr></thead><tbody>`;
-    indexed.forEach(({r},pos)=>{
+    sorted.forEach((r,pos)=>{
       const days=dayCount(r.dateFrom,r.dateTo);
       html+=`<tr>
         <td class="no-col">${pos+1}</td>
@@ -731,7 +753,77 @@ function renderReport(){
         <td style="white-space:nowrap">${thDate(r.dateFrom)}</td>
         <td style="white-space:nowrap">${thDate(r.dateTo)}</td>
         <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
-        <td class="note-cell" contenteditable="true" data-placeholder="—" 
+        <td class="note-cell" contenteditable="true" data-placeholder="—"
+            style="min-width:120px;outline:none;color:var(--text2);font-size:.85em;cursor:text"
+            onclick="this.focus()"></td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+  } else {
+    // ══ โหมดจัดระเบียบ: รวมชื่อ+ประเภท แสดงวันที่ทั้งหมด ══
+    // ── จัดกลุ่ม: ชื่อ + ประเภท → รวม range วันทั้งหมด ──
+    const grouped = []; // [{name, dept, leaveType, dates:[], totalDays}]
+    rows.forEach(r => {
+      const key = (r.name||'') + '||' + (r.leaveType||'');
+      let grp = grouped.find(g => g.key === key);
+      if(!grp){
+        grp = {key, name:r.name||'-', dept:r.dept||'-', leaveType:r.leaveType||'-', ranges:[], totalDays:0};
+        grouped.push(grp);
+      }
+      grp.ranges.push({from:toISO(r.dateFrom), to:toISO(r.dateTo||r.dateFrom)});
+      grp.totalDays += dayCount(r.dateFrom, r.dateTo);
+    });
+
+    // expand ranges to individual dates, deduplicate, sort
+    function expandDates(ranges){
+      const set = new Set();
+      ranges.forEach(({from,to})=>{
+        if(!from) return;
+        let cur = new Date(from);
+        const end = new Date(to||from);
+        while(cur <= end){
+          set.add(cur.toISOString().slice(0,10));
+          cur.setDate(cur.getDate()+1);
+        }
+      });
+      return [...set].sort();
+    }
+    function fmtDayList(dates){
+      // group consecutive into ranges, show as "1-5, 7, 10-12"
+      if(!dates.length) return '-';
+      const nums = dates.map(d=>+d.slice(8,10)); // day-of-month
+      const parts=[]; let start=nums[0], prev=nums[0];
+      for(let i=1;i<nums.length;i++){
+        if(nums[i]===prev+1){prev=nums[i];}
+        else{parts.push(start===prev?`${start}`:`${start}–${prev}`);start=prev=nums[i];}
+      }
+      parts.push(start===prev?`${start}`:`${start}–${prev}`);
+      // get month label from first date
+      const m=+dates[0].slice(5,7), y=+dates[0].slice(0,4);
+      const THS=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      return `วันที่ ${parts.join(', ')} ${THS[m]} ${y+543}`;
+    }
+
+    // sort: name asc, then leaveType
+    grouped.sort((a,b)=>a.name.localeCompare(b.name,'th')||a.leaveType.localeCompare(b.leaveType,'th'));
+
+    html+=`<div class="rpt-table-wrap"><table>
+      <thead><tr>
+        <th style="width:32px">#</th>
+        <th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th>
+        <th>วันที่จำหน่าย</th><th style="text-align:center">รวม</th><th style="min-width:120px">หมายเหตุ</th>
+      </tr></thead><tbody>`;
+    grouped.forEach((g,pos)=>{
+      const dates = expandDates(g.ranges);
+      const dateStr = fmtDayList(dates);
+      html+=`<tr>
+        <td class="no-col">${pos+1}</td>
+        <td style="font-weight:600">${esc(g.name)}</td>
+        <td><span class="dept-tag">${esc(g.dept)}</span></td>
+        <td><span class="badge b-${esc(g.leaveType)}">${TYPE_ICON[g.leaveType]||''} ${esc(g.leaveType)}</span></td>
+        <td style="font-size:.83em;color:var(--text2)">${esc(dateStr)}</td>
+        <td style="text-align:center"><span class="days-pill">${dates.length} วัน</span></td>
+        <td class="note-cell" contenteditable="true" data-placeholder="—"
             style="min-width:120px;outline:none;color:var(--text2);font-size:.85em;cursor:text"
             onclick="this.focus()"></td>
       </tr>`;
@@ -777,14 +869,30 @@ function exportExcel(){
   const indexed=rows.map((r,_)=>({r,idx:allData.indexOf(r)}));
   indexed.sort((a,b)=>b.idx-a.idx);
 
-  const headers=['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน','หมายเหตุ'];
-  // collect note cells from DOM
+  const isGrouped = reportMode === 'grouped';
+  const headers = isGrouped
+    ? ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่จำหน่าย','รวม','หมายเหตุ']
+    : ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน','หมายเหตุ'];
   const noteCells=[...document.querySelectorAll('.note-cell')];
-  const data=indexed.map(({r},i)=>[
-    i+1, r.name||'-', r.dept||'-', r.leaveType||'-',
-    thDate(r.dateFrom), thDate(r.dateTo), dayCount(r.dateFrom,r.dateTo),
-    noteCells[i]?noteCells[i].innerText.trim():''
-  ]);
+  let data=[];
+
+  if(isGrouped){
+    // re-group
+    const exGrp=[];
+    rows.forEach(r=>{
+      const key=(r.name||'')+'||'+(r.leaveType||'');
+      let g=exGrp.find(x=>x.key===key);
+      if(!g){g={key,name:r.name||'-',dept:r.dept||'-',leaveType:r.leaveType||'-',ranges:[]};exGrp.push(g);}
+      g.ranges.push({from:toISO(r.dateFrom),to:toISO(r.dateTo||r.dateFrom)});
+    });
+    exGrp.sort((a,b)=>a.name.localeCompare(b.name,'th')||a.leaveType.localeCompare(b.leaveType,'th'));
+    function exExp(ranges){const set=new Set();ranges.forEach(({from,to})=>{if(!from)return;let cur=new Date(from);const end=new Date(to||from);while(cur<=end){set.add(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}});return[...set].sort();}
+    function exFmt(dates){if(!dates.length)return'-';const nums=dates.map(d=>+d.slice(8,10));const parts=[];let s=nums[0],p=nums[0];for(let i=1;i<nums.length;i++){if(nums[i]===p+1){p=nums[i];}else{parts.push(s===p?`${s}`:`${s}–${p}`);s=p=nums[i];}}parts.push(s===p?`${s}`:`${s}–${p}`);const THS=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const m=+dates[0].slice(5,7),y=+dates[0].slice(0,4);return`วันที่ ${parts.join(', ')} ${THS[m]} ${y+543}`;}
+    data=exGrp.map((g,i)=>[i+1,g.name,g.dept,g.leaveType,exFmt(exExp(g.ranges)),exExp(g.ranges).length+' วัน',noteCells[i]?noteCells[i].innerText.trim():'']);
+  } else {
+    const sorted=[...rows].sort((a,b)=>(a.name||'').localeCompare(b.name||'','th'));
+    data=sorted.map((r,i)=>[i+1,r.name||'-',r.dept||'-',r.leaveType||'-',thDate(r.dateFrom),thDate(r.dateTo),dayCount(r.dateFrom,r.dateTo)+' วัน',noteCells[i]?noteCells[i].innerText.trim():'']);
+  }
 
   // title rows
   const titleRows=[
@@ -794,7 +902,7 @@ function exportExcel(){
   if(dept) titleRows.push([`แผนก: ${dept==='ALL'?'ทุกแผนก':dept}`]);
   if(currentMode==='month'&&month) titleRows.push([`เดือน: ${TH_M_FULL[+month]}`]);
   if(currentMode==='range'&&(dateFrom||dateTo)) titleRows.push([`ช่วง: ${thDate(dateFrom)} – ${thDate(dateTo)}`]);
-  titleRows.push([`พิมพ์เมื่อ: ${nowTH()}`],['11-7'],['']);
+  titleRows.push([`พิมพ์เมื่อ: ${nowTH()}`],['']);
 
   const wb=XLSX.utils.book_new();
   const wsData=[...titleRows, headers, ...data];
@@ -808,7 +916,7 @@ function exportExcel(){
   const ws=XLSX.utils.aoa_to_sheet(wsData);
 
   // column widths
-  ws['!cols']=[{wch:5},{wch:28},{wch:14},{wch:12},{wch:16},{wch:16},{wch:10},{wch:22}];
+  ws['!cols']=isGrouped?[{wch:5},{wch:28},{wch:14},{wch:12},{wch:36},{wch:10},{wch:22}]:[{wch:5},{wch:28},{wch:14},{wch:12},{wch:16},{wch:16},{wch:10},{wch:22}];
 
   // style header row (row index = titleRows.length)
   const hdrRow=titleRows.length;

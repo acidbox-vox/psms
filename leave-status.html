@@ -98,6 +98,8 @@ select:focus, input:focus { border-color: rgba(59,124,244,0.5); background: #fff
 .btn-search:hover { background: #2563d0; border-color: #2563d0; color: #fff; }
 .btn-rpt { background: #059669; color: #fff; border-color: #059669; }
 .btn-rpt:hover { background: #047857; border-color: #047857; color: #fff; }
+.btn-rpt-grouped { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+.btn-rpt-grouped:hover { background: #6d28d9; border-color: #6d28d9; color: #fff; }
 .search-wrap { min-width: 170px; }
 input[type="text"] {
   width: 100%; padding: 9px 12px;
@@ -302,7 +304,8 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
     <button class="btn-sm btn-search" onclick="applyFilters()">🔍 แสดง</button>
     <button class="btn-sm" onclick="clearFilters()">✕ ล้าง</button>
     <button class="btn-sm" onclick="loadData(true)">🔄 รีเฟรช</button>
-    <button class="btn-sm btn-rpt" onclick="openReport()">🖨️ พิมพ์รายงาน</button>
+    <button class="btn-sm btn-rpt" onclick="openReport('normal')">🖨️ รายงานปกติ</button>
+    <button class="btn-sm btn-rpt-grouped" onclick="openReport('grouped')">📋 รายงานจัดระเบียบ</button>
   </div>
 
   <div class="table-wrap">
@@ -505,8 +508,8 @@ function clearFilters() {
   document.getElementById('f-search').value = '';
   showPrompt();
 }
-function openReport() {
-  window.location.href = 'leave-report.html';
+function openReport(mode) {
+  window.location.href = 'leave-report.html?mode=' + (mode||'normal');
 }
 </script>
 
