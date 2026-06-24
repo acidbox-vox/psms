@@ -931,21 +931,26 @@ function renderReport(){
   // ── ข้อความรับรอง ──
   html+=`
   <div class="rpt-cert">
-    <p>ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกัน</p><p>ในการเบิกค่าล่วงเวลา,ไปราชการ,ศึกษา</p>
-    <div class="sig-line">
-      <div class="sig-block">
-        <div style="font-size:.85em;color:var(--text2);margin-bottom:2px">ตรวจถูกต้องแล้ว</div>
-        <div class="sig-dots">...................................................................</div>
-        <div>(...................................................................)</div>
-        <div style="margin-top:2px">วันที่............/........................./...................</div>
-      </div>
+  <!-- บรรทัดแรกปล่อยชิดซ้ายปกติ -->
+  <p style="margin-bottom: 0;">ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกัน</p>
+  
+  <!-- บรรทัดที่สอง ใช้ padding-left หรือ text-indent เพื่อดันข้อความให้เข้าไปเท่ากับระยะคำว่า "ขอรับรองว่า" -->
+  <p style="margin-top: 0; padding-left: 5.5em;">ในการเบิกค่าล่วงเวลา ไปราชการ หรือศึกษาต่อ</p>
+  
+  <div class="sig-line" style="margin-top: 20px;">
+    <div class="sig-block">
+      <div style="font-size: 0.85em; color: var(--text2, #666); margin-bottom: 2px;">ตรวจถูกต้องแล้ว</div>
+      <div class="sig-dots">...................................................................</div>
+      <div>(...................................................................)</div>
+      <div style="margin-top: 5px;">วันที่............/........................./...................</div>
     </div>
-  </div>`;
+  </div>
+</div>`;
 
   html+=`<div class="rpt-footer">
     <div>รายงานนี้ผลิตโดยระบบบันทึกการจำหน่าย${unitName?' · '+unitName:''}</div>
     <div>พิมพ์เมื่อ ${nowTH()}</div>
-  </div>`;
+  </div>
 
   document.getElementById('report-inner').innerHTML=html;
   document.getElementById('btn-pdf').style.display='';
