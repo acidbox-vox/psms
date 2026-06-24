@@ -173,6 +173,11 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 }
 
 /* Certification */
+.rpt-info-bar{
+  background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;
+  padding:7px 14px;margin-bottom:10px;font-size:.82em;font-weight:700;color:var(--text2);
+  display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
 .rpt-cert{margin-top:32px;padding:20px 24px 20px 0;display:flex;flex-direction:column;align-items:flex-end;text-align:left}
 .rpt-cert p{font-size:.88em;line-height:1.9;color:var(--text);max-width:560px}
 .rpt-cert .sig-line{margin-top:16px;display:flex;align-items:flex-end;gap:32px;flex-wrap:wrap}
@@ -759,21 +764,37 @@ function renderReport(){
   } else if(reportMode === 'normal'){
     // ══ โหมดปกติ: แสดงทุกรายการ ══
     const sorted = [...rows].sort((a,b)=>(a.name||'').localeCompare(b.name||'','th'));
+    // ตรวจว่ามีหลายแผนกไหม
+    const uniqueDepts = [...new Set(sorted.map(r=>r.dept).filter(Boolean))];
+    const multiDept   = uniqueDepts.length > 1;
+    // ตรวจประเภทที่มีในผลลัพธ์
+    const uniqueTypes = [...new Set(sorted.map(r=>r.leaveType).filter(Boolean))];
+    const multiType   = uniqueTypes.length > 1;
+    // แถวข้อมูลสรุปบนตาราง
+    const infoLines = [];
+    if(!multiDept && uniqueDepts.length===1) infoLines.push(`หน่วย: ${uniqueDepts[0]}`);
+    if(!multiType && uniqueTypes.length===1) infoLines.push(`ประเภทการจำหน่าย: ${TYPE_ICON[uniqueTypes[0]]||''} ${uniqueTypes[0]}`);
+    if(infoLines.length) html+=`<div class="rpt-info-bar">${infoLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;')}</div>`;
     html+=`<div class="rpt-table-wrap"><table>
       <thead><tr>
-        <th style="width:32px">#</th>
-        <th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th>
-        <th>วันที่ไป</th><th>วันที่กลับ</th><th style="text-align:center">จำนวน</th><th style="min-width:130px">11-7 เลขที่</th>
+        <th style="width:32px;text-align:center">#</th>
+        <th style="text-align:center">ชื่อ - นามสกุล</th>
+        ${multiDept?'<th style="text-align:center">แผนก</th>':''}
+        ${multiType?'<th style="text-align:center">ประเภท</th>':''}
+        <th style="text-align:center">วันที่ไป</th>
+        <th style="text-align:center">วันที่กลับ</th>
+        <th style="text-align:center">จำนวน</th>
+        <th style="text-align:center;min-width:130px">11-7 เลขที่</th>
       </tr></thead><tbody>`;
     sorted.forEach((r,pos)=>{
       const days=dayCount(r.dateFrom,r.dateTo);
       html+=`<tr>
-        <td class="no-col">${pos+1}</td>
+        <td style="text-align:center" class="no-col">${pos+1}</td>
         <td style="font-weight:600">${esc(r.name||'-')}</td>
-        <td><span class="dept-tag">${esc(r.dept||'-')}</span></td>
-        <td><span class="badge b-${esc(r.leaveType)}">${TYPE_ICON[r.leaveType]||''} ${esc(r.leaveType)}</span></td>
-        <td style="white-space:nowrap">${thDate(r.dateFrom)}</td>
-        <td style="white-space:nowrap">${thDate(r.dateTo)}</td>
+        ${multiDept?`<td><span class="dept-tag">${esc(r.dept||'-')}</span></td>`:''}
+        ${multiType?`<td><span class="badge b-${esc(r.leaveType)}">${TYPE_ICON[r.leaveType]||''} ${esc(r.leaveType)}</span></td>`:''}
+        <td style="white-space:nowrap;text-align:center">${thDate(r.dateFrom)}</td>
+        <td style="white-space:nowrap;text-align:center">${thDate(r.dateTo)}</td>
         <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
         <td style="min-width:130px;padding:0">
           <div class="note-cell-wrap">
@@ -834,21 +855,39 @@ function renderReport(){
     // sort: name asc, then leaveType
     grouped.sort((a,b)=>a.name.localeCompare(b.name,'th')||a.leaveType.localeCompare(b.leaveType,'th'));
 
+    // ตรวจหลายแผนก/ประเภทในโหมด grouped
+    const gUniqueDepts = [...new Set(grouped.map(g=>g.dept).filter(Boolean))];
+    const gMultiDept   = gUniqueDepts.length > 1;
+    const gUniqueTypes = [...new Set(grouped.map(g=>g.leaveType).filter(Boolean))];
+    const gMultiType   = gUniqueTypes.length > 1;
+    const gInfoLines   = [];
+    if(!gMultiDept && gUniqueDepts.length===1) gInfoLines.push(`หน่วย: ${gUniqueDepts[0]}`);
+    if(!gMultiType && gUniqueTypes.length===1) gInfoLines.push(`ประเภทการจำหน่าย: ${TYPE_ICON[gUniqueTypes[0]]||''} ${gUniqueTypes[0]}`);
+    if(gInfoLines.length) html+=`<div class="rpt-info-bar">${gInfoLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;')}</div>`;
     html+=`<div class="rpt-table-wrap"><table>
       <thead><tr>
-        <th style="width:32px">#</th>
-        <th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th>
-        <th>วันที่จำหน่าย</th><th style="text-align:center">รวม</th><th style="min-width:130px">11-7 เลขที่</th>
+        <th style="width:32px;text-align:center">#</th>
+        <th style="text-align:center">ชื่อ - นามสกุล</th>
+        ${gMultiDept?'<th style="text-align:center">แผนก</th>':''}
+        ${gMultiType?'<th style="text-align:center">ประเภท</th>':''}
+        <th style="text-align:center">วันที่จำหน่าย</th>
+        <th style="text-align:center">รวม</th>
+        <th style="text-align:center;min-width:130px">11-7 เลขที่</th>
       </tr></thead><tbody>`;
     grouped.forEach((g,pos)=>{
       const dates = expandDates(g.ranges);
-      const dateStr = fmtDayList(dates);
+      const dayNums = dates.map(d=>+d.slice(8,10));
+      const dateStr = dayNums.join(', ');
+      const THS_M=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      const dm = dates.length ? +dates[0].slice(5,7) : 0;
+      const dy = dates.length ? +dates[0].slice(0,4)+543 : '';
+      const dateLabel = dates.length ? `วันที่ ${dateStr} ${THS_M[dm]} ${dy}` : '-';
       html+=`<tr>
-        <td class="no-col">${pos+1}</td>
+        <td style="text-align:center" class="no-col">${pos+1}</td>
         <td style="font-weight:600">${esc(g.name)}</td>
-        <td><span class="dept-tag">${esc(g.dept)}</span></td>
-        <td><span class="badge b-${esc(g.leaveType)}">${TYPE_ICON[g.leaveType]||''} ${esc(g.leaveType)}</span></td>
-        <td style="font-size:.83em;color:var(--text2)">${esc(dateStr)}</td>
+        ${gMultiDept?`<td><span class="dept-tag">${esc(g.dept)}</span></td>`:''}
+        ${gMultiType?`<td><span class="badge b-${esc(g.leaveType)}">${TYPE_ICON[g.leaveType]||''} ${esc(g.leaveType)}</span></td>`:''}
+        <td style="font-size:.83em;color:var(--text2)">${esc(dateLabel)}</td>
         <td style="text-align:center"><span class="days-pill">${dates.length} วัน</span></td>
         <td style="min-width:130px;padding:0">
           <div class="note-cell-wrap">
@@ -867,12 +906,12 @@ function renderReport(){
   html+=`
   <div class="rpt-cert">
     <p>ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกันในการเบิกค่าล่วงเวลา,ไปราชการ,ศึกษา</p>
-    <p style="margin-top:6px">ตรวจถูกต้องแล้ว</p>
     <div class="sig-line">
       <div class="sig-block">
+        <div style="font-size:.85em;color:var(--text2);margin-bottom:2px">ตรวจถูกต้องแล้ว</div>
         <div class="sig-dots">...................................................................</div>
         <div>(...................................................................)</div>
-        <div style="margin-top:4px">วันที่............/........................./...................</div>
+        <div style="margin-top:2px">วันที่............/........................./...................</div>
       </div>
     </div>
   </div>`;
