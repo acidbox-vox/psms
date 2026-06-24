@@ -268,11 +268,9 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 
 <div class="wrap">
 
-  <!-- ═══ Filter card ═══ -->
   <div class="filter-card no-print">
     <div class="filter-title">⚙️ ตั้งค่าการรายงาน</div>
 
-    <!-- รูปแบบรายงาน -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border)">
       <span style="font-size:.75em;font-weight:700;color:var(--text2);white-space:nowrap">📄 รูปแบบ</span>
       <div class="mode-toggle" style="max-width:300px">
@@ -281,7 +279,6 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
       </div>
     </div>
 
-    <!-- ① แผนก + ช่วงเวลา -->
     <div class="filter-section">
       <div class="section-lbl">🏢 แผนก &amp; ช่วงเวลา</div>
       <div class="filter-row">
@@ -329,15 +326,12 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
       </div>
     </div>
 
-    <!-- ② ประเภท -->
     <div class="filter-section">
       <div class="section-lbl">🗂️ ประเภทการจำหน่าย <span style="color:var(--text3);font-weight:400;font-size:.9em">(คลิกเลือก/ยกเลิก)</span></div>
       <div class="type-checks" id="type-checks">
-        <!-- สร้างจาก JS -->
-      </div>
+        </div>
     </div>
 
-    <!-- ③ ค้นหารายชื่อ (เพิ่มหลายคน) -->
     <div class="filter-section">
       <div class="section-lbl">👤 เลือกรายชื่อ (ไม่ระบุ = ทุกคน)</div>
       <div class="people-wrap">
@@ -356,7 +350,6 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
       </div>
     </div>
 
-    <!-- ④ ปุ่ม -->
     <div class="btn-row" style="margin-top:4px">
       <button class="btn btn-primary" onclick="doSearch()">🔍 แสดงรายงาน</button>
       <button class="btn btn-ghost" onclick="clearFilters()">✕ ล้างทั้งหมด</button>
@@ -365,7 +358,6 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
     </div>
   </div>
 
-  <!-- ═══ Report ═══ -->
   <div class="report-wrap">
     <div class="report-inner" id="report-inner">
       <div class="empty-state">
@@ -928,29 +920,26 @@ function renderReport(){
     html+='</tbody></table></div>';
   }
 
-  // ── ข้อความรับรอง ──
+  // ── ข้อความรับรอง (ปรับปรุงการจัดหน้าตามต้องการ) ──
   html+=`
   <div class="rpt-cert">
-  <!-- บรรทัดแรกปล่อยชิดซ้ายปกติ -->
-  <p style="margin-bottom: 0;">ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกัน</p>
-  
-  <!-- บรรทัดที่สอง ใช้ padding-left หรือ text-indent เพื่อดันข้อความให้เข้าไปเท่ากับระยะคำว่า "ขอรับรองว่า" -->
-  <p style="margin-top: 0; padding-left: 5.5em;">ในการเบิกค่าล่วงเวลา ไปราชการ หรือศึกษาต่อ</p>
-  
-  <div class="sig-line" style="margin-top: 20px;">
-    <div class="sig-block">
-      <div style="font-size: 0.85em; color: var(--text2, #666); margin-bottom: 2px;">ตรวจถูกต้องแล้ว</div>
-      <div class="sig-dots">...................................................................</div>
-      <div>(...................................................................)</div>
-      <div style="margin-top: 5px;">วันที่............/........................./...................</div>
+    <p>ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกัน
+       <span style="display: block; padding-left: 5.5em;">ในการเบิกค่าล่วงเวลา ไปราชการ หรือศึกษาต่อ</span>
+    </p>
+    <div class="sig-line">
+      <div class="sig-block">
+        <div style="font-size:.85em;color:var(--text2);margin-bottom:2px">ตรวจถูกต้องแล้ว</div>
+        <div class="sig-dots">...................................................................</div>
+        <div>(...................................................................)</div>
+        <div style="margin-top:2px">วันที่............/........................./...................</div>
+      </div>
     </div>
-  </div>
-</div>`;
+  </div>`;
 
   html+=`<div class="rpt-footer">
     <div>รายงานนี้ผลิตโดยระบบบันทึกการจำหน่าย${unitName?' · '+unitName:''}</div>
     <div>พิมพ์เมื่อ ${nowTH()}</div>
-  </div>
+  </div>`;
 
   document.getElementById('report-inner').innerHTML=html;
   document.getElementById('btn-pdf').style.display='';
@@ -1013,7 +1002,7 @@ function exportExcel(){
   const wb=XLSX.utils.book_new();
   const wsData=[...titleRows, headers, ...data];
   wsData.push([]);
-  wsData.push(['ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกันในการเบิกค่าล่วงเวลา,ไปราชการ,ศึกษา']);
+  wsData.push(['ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกัน ในการเบิกค่าล่วงเวลา ไปราชการ หรือศึกษาต่อ']);
   wsData.push(['ตรวจถูกต้องแล้ว']);
   wsData.push([]);
   wsData.push(['ลงชื่อ ......................................']);
