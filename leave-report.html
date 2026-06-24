@@ -181,10 +181,8 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
   border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.badge-117{
-  padding:6px 14px;border-radius:20px;font-size:.82em;font-weight:800;
-  background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;
-  letter-spacing:.05em;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+
+
 
 /* Progress bar */
 .load-progress-wrap{padding:28px 36px;text-align:center}
@@ -237,7 +235,6 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 <div class="topbar no-print">
   <a href="leave-status.html" class="back-btn">← สถานะจำหน่าย</a>
   <span class="page-title">🖨️ รายงานสถานะจำหน่าย</span>
-  <div class="badge-117">🕐 11-7</div>
 </div>
 
 <div class="wrap">
@@ -398,7 +395,7 @@ function buildTypeChecks(){
     el.className = `type-check chk-${t} on`;
     el.dataset.type = t;
     el.innerHTML = `${TYPE_ICON[t]||''} ${t}`;
-    el.onclick = () => { el.classList.toggle('on'); };
+    el.onclick = () => { el.classList.toggle('on'); if(dataLoaded) renderReport(); };
     wrap.appendChild(el);
   });
 }
@@ -707,6 +704,7 @@ function renderReport(){
     <div class="rpt-meta">
       <div>พิมพ์เมื่อ</div><div><strong>${nowTH()}</strong></div>
       <div style="margin-top:4px">รวม <strong>${rows.length}</strong> รายการ</div>
+      <div style="margin-top:8px"><span style="display:inline-block;padding:3px 12px;border-radius:20px;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;font-size:.78em;font-weight:800;letter-spacing:.06em;-webkit-print-color-adjust:exact;print-color-adjust:exact">🕐 11-7</span></div>
     </div>
   </div>
   <div class="rpt-summary">
@@ -796,7 +794,7 @@ function exportExcel(){
   if(dept) titleRows.push([`แผนก: ${dept==='ALL'?'ทุกแผนก':dept}`]);
   if(currentMode==='month'&&month) titleRows.push([`เดือน: ${TH_M_FULL[+month]}`]);
   if(currentMode==='range'&&(dateFrom||dateTo)) titleRows.push([`ช่วง: ${thDate(dateFrom)} – ${thDate(dateTo)}`]);
-  titleRows.push([`พิมพ์เมื่อ: ${nowTH()}`],['']);
+  titleRows.push([`พิมพ์เมื่อ: ${nowTH()}`],['11-7'],['']);
 
   const wb=XLSX.utils.book_new();
   const wsData=[...titleRows, headers, ...data];
