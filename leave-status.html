@@ -402,9 +402,11 @@ function showPrompt() {
 async function loadData(force) {
   if (!API) { document.getElementById('tbody').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
   document.getElementById('tbody').innerHTML='<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
+  // เริ่ม fetch ก่อน แล้วค่อย show loader — ไม่บล็อก network request
+  var dataPromise = window.DataCache ? DataCache.getLeaves(force) : fetch(API+'?action=getLeaves').then(r=>r.json()).then(d=>d||[]);
   if(window.Loader) Loader.show();
   try {
-    allData = window.DataCache ? await DataCache.getLeaves(force) : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
+    allData = await dataPromise;
     dataLoaded = true;
     // sync dept dropdown ถ้าข้อมูลมาจาก getLeaves
     const depts = [...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();

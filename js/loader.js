@@ -15,7 +15,7 @@
 
   /* ── Graph ── */
   function buildGraph() {
-    var N = 65, ns = [], es = [];
+    var N = 40, ns = [], es = [];
     for (var i = 0; i < N; i++)
       ns.push({ x: 10 + Math.random() * (W - 20), y: 10 + Math.random() * (H - 20) });
 
@@ -215,15 +215,20 @@
   function restart() {
     if (raf) cancelAnimationFrame(raf);
     resize();
-    var g = buildGraph();
-    nodes = g.ns; edges = g.es; si = g.si; ei = g.ei;
-    var d = dijkstra(nodes, edges, si, ei);
-    var a = aStar(nodes, edges, si, ei);
-    dijkV = d.vis; dijkP = d.p; aV = a.vis; aP = a.p;
-    state = { phase: 'explore', dijkR: 0, aR: 0, dijkPR: 0, aPR: 0, _dataReady: false };
     hidden = false;
+    // reset state ทันที ให้ canvas เปิดก่อน
+    nodes = null;
+    state = { phase: 'explore', dijkR: 0, aR: 0, dijkPR: 0, aPR: 0, _dataReady: false };
     if (pbar) pbar.style.width = '0%';
-    draw();
+    draw(); // เริ่ม loop ก่อน (แสดง canvas เปล่า)
+    // defer การคำนวณกราฟหนักๆ ไว้หลัง fetch เริ่มแล้ว
+    setTimeout(function () {
+      var g = buildGraph();
+      nodes = g.ns; edges = g.es; si = g.si; ei = g.ei;
+      var d = dijkstra(nodes, edges, si, ei);
+      var a = aStar(nodes, edges, si, ei);
+      dijkV = d.vis; dijkP = d.p; aV = a.vis; aP = a.p;
+    }, 0);
   }
 
   /* ── Public API ── */
