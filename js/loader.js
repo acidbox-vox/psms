@@ -174,7 +174,7 @@
       ctx.textAlign = 'center'; ctx.fillText(m[2], n.x, n.y - 14);
     });
 
-    /* animate phases */
+    /* animate phases — ผูกกับ _dataReady ไม่ให้ path ถึง TARGET ก่อนข้อมูลมา */
     if (s.phase === 'explore') {
       s.dijkR = Math.min((s.dijkR || 0) + 1.2, dijkV.length);
       s.aR    = Math.min((s.aR    || 0) + 2.2, aV.length);
@@ -182,14 +182,21 @@
       if (pbar) pbar.style.width = p + '%';
       if (s.dijkR >= dijkV.length && s.aR >= aV.length) s.phase = 'path';
     } else if (s.phase === 'path') {
-      s.dijkPR = Math.min((s.dijkPR || 0) + 0.4, Math.max(dijkP.length - 1, 1));
-      s.aPR    = Math.min((s.aPR    || 0) + 0.6, Math.max(aP.length    - 1, 1));
-      var p = 55 + Math.round(45 * Math.max(
-        s.dijkPR / Math.max(dijkP.length - 1, 1),
-        s.aPR    / Math.max(aP.length    - 1, 1)
-      ));
+      var maxDijkPR = s._dataReady ? Math.max(dijkP.length - 1, 1) : Math.max(dijkP.length - 1, 1) * 0.82;
+      var maxAPR    = s._dataReady ? Math.max(aP.length    - 1, 1) : Math.max(aP.length    - 1, 1) * 0.82;
+      /* ชะลอเมื่อใกล้ขีดจำกัด — ไม่ให้ดูสะดุดหยุดนิ่ง */
+      var dijkRemain = maxDijkPR - (s.dijkPR || 0);
+      var aRemain    = maxAPR    - (s.aPR    || 0);
+      s.dijkPR = Math.min((s.dijkPR || 0) + Math.max(0.05, dijkRemain * 0.06 + 0.12), maxDijkPR);
+      s.aPR    = Math.min((s.aPR    || 0) + Math.max(0.05, aRemain    * 0.06 + 0.18), maxAPR);
+      var ratio = Math.max(
+        (s.dijkPR) / Math.max(dijkP.length - 1, 1),
+        (s.aPR)    / Math.max(aP.length    - 1, 1)
+      );
+      var p = 55 + Math.round(40 * ratio);
       if (pbar) pbar.style.width = p + '%';
-      if (s.dijkPR >= dijkP.length - 1 && s.aPR >= aP.length - 1) {
+      /* จบได้เมื่อข้อมูลพร้อม และ animation วิ่งถึง target แล้ว */
+      if (s._dataReady && s.dijkPR >= dijkP.length - 1 && s.aPR >= aP.length - 1) {
         s.phase = 'done';
         if (pbar) pbar.style.width = '100%';
       }
@@ -213,7 +220,7 @@
     var d = dijkstra(nodes, edges, si, ei);
     var a = aStar(nodes, edges, si, ei);
     dijkV = d.vis; dijkP = d.p; aV = a.vis; aP = a.p;
-    state = { phase: 'explore', dijkR: 0, aR: 0, dijkPR: 0, aPR: 0 };
+    state = { phase: 'explore', dijkR: 0, aR: 0, dijkPR: 0, aPR: 0, _dataReady: false };
     hidden = false;
     if (pbar) pbar.style.width = '0%';
     draw();
@@ -222,21 +229,36 @@
   /* ── Public API ── */
   window.Loader = {
     hide: function () {
-      if (pbar) pbar.style.width = '100%';
-      setTimeout(function () {
-        canvas.style.transition = 'opacity 0.4s ease';
-        canvas.style.opacity = '0';
-        if (pbar) {
-          pbar.parentNode.style.transition = 'opacity 0.4s ease';
-          pbar.parentNode.style.opacity = '0';
-        }
+      /* บอก animation ว่าข้อมูลพร้อมแล้ว → วิ่งจบได้เลย */
+      if (state) state._dataReady = true;
+
+      function doFade() {
+        if (pbar) pbar.style.width = '100%';
         setTimeout(function () {
-          hidden = true;
-          if (raf) cancelAnimationFrame(raf);
-          canvas.style.display = 'none';
-          if (pbar) pbar.parentNode.style.display = 'none';
-        }, 420);
-      }, 150);
+          canvas.style.transition = 'opacity 0.4s ease';
+          canvas.style.opacity = '0';
+          if (pbar) {
+            pbar.parentNode.style.transition = 'opacity 0.4s ease';
+            pbar.parentNode.style.opacity = '0';
+          }
+          setTimeout(function () {
+            hidden = true;
+            if (raf) cancelAnimationFrame(raf);
+            canvas.style.display = 'none';
+            if (pbar) pbar.parentNode.style.display = 'none';
+          }, 420);
+        }, 150);
+      }
+
+      /* รอให้ animation วิ่งถึง TARGET ก่อน (max 1.5s) แล้วค่อย fade */
+      var waited = 0;
+      var waitInterval = setInterval(function () {
+        waited += 50;
+        if ((state && state.phase === 'done') || waited >= 1500) {
+          clearInterval(waitInterval);
+          doFade();
+        }
+      }, 50);
     },
     show: function () {
       hidden = false;
