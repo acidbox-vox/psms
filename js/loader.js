@@ -18,12 +18,32 @@
     var N = 65, ns = [], es = [];
     for (var i = 0; i < N; i++)
       ns.push({ x: 10 + Math.random() * (W - 20), y: 10 + Math.random() * (H - 20) });
+
+    /* 1. Minimum spanning tree — การันตีว่าทุก node เชื่อมถึงกันแน่นอน */
+    var inTree = [0], notIn = [];
+    for (var i = 1; i < N; i++) notIn.push(i);
+    while (notIn.length) {
+      var bestD = Infinity, bestI = -1, bestJ = -1;
+      for (var a = 0; a < inTree.length; a++) {
+        for (var b = 0; b < notIn.length; b++) {
+          var d = hypot(ns[inTree[a]], ns[notIn[b]]);
+          if (d < bestD) { bestD = d; bestI = inTree[a]; bestJ = notIn[b]; }
+        }
+      }
+      es.push([bestI, bestJ]);
+      inTree.push(bestJ);
+      notIn.splice(notIn.indexOf(bestJ), 1);
+    }
+
+    /* 2. เพิ่ม edge แบบสุ่มให้กราฟดูหนาแน่นขึ้น */
     for (var i = 0; i < N; i++) {
       var c = [];
       for (var j = 0; j < N; j++) if (i !== j) c.push({ j: j, d: hypot(ns[i], ns[j]) });
       c.sort(function (a, b) { return a.d - b.d; });
       c.slice(0, 3).forEach(function (x) { if (x.d < 115) es.push([i, x.j]); });
     }
+
+    /* 3. เลือก start/end จากคู่ที่ไกลที่สุด — path มีแน่นอนจาก MST */
     var s = 0, e = 1, mx = 0;
     for (var i = 0; i < N; i++) for (var j = i + 1; j < N; j++) {
       var d = hypot(ns[i], ns[j]); if (d > mx) { mx = d; s = i; e = j; }
