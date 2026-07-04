@@ -402,6 +402,7 @@ function showPrompt() {
 async function loadData(force) {
   if (!API) { document.getElementById('tbody').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
   document.getElementById('tbody').innerHTML='<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
+  if(window.Loader) Loader.show();
   try {
     allData = window.DataCache ? await DataCache.getLeaves(force) : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
     dataLoaded = true;
@@ -415,7 +416,9 @@ async function loadData(force) {
       if (cur) sel.value = cur;
     }
     applyFilters();
+    if(window.Loader) Loader.hide();
   } catch(e) {
+    if(window.Loader) Loader.hide();
     document.getElementById('tbody').innerHTML=`<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${e.message}</small></p></div>`;
     showToast('❌ โหลดข้อมูลไม่ได้','error');
   }
