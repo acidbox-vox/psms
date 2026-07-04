@@ -8,6 +8,7 @@
 <script src="js/api-config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
+<script src="js/loader.js"></script>
 <script>
 // Auth guard — redirect to login if not logged in
 (function(){
@@ -291,7 +292,19 @@ var badge = document.getElementById('unitBadge');
 if(uName && badge){ badge.textContent = '📞 ' + uName; }
 
 // Preload ข้อมูลล่วงหน้าขณะอยู่หน้าหลัก
-if(window.DataCache) DataCache.preload();
+// รอ preload เสร็จก่อน แล้ว loader ค่อยปิด → หน้าถัดไปได้ cache ทันที
+if(window.DataCache) {
+  var _loaderTimeout = setTimeout(function(){if(window.Loader)Loader.hide();}, 8000); // safety net
+  DataCache.preload().then(function(){
+    clearTimeout(_loaderTimeout);
+    if(window.Loader) Loader.hide();
+  }).catch(function(){
+    clearTimeout(_loaderTimeout);
+    if(window.Loader) Loader.hide();
+  });
+} else {
+  if(window.Loader) Loader.hide();
+}
 
 function doLogout(){
   sessionStorage.removeItem('loggedIn');

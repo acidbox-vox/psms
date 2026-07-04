@@ -8,6 +8,7 @@
 <script src="js/api-config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
+<script src="js/loader.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
 :root {
@@ -230,7 +231,7 @@ function buildMonthOptions() {
   const sel=document.getElementById('f-month'); const now=new Date(); sel.innerHTML='';
   for (let i=-3;i<=9;i++) { const d=new Date(now.getFullYear(),now.getMonth()+i,1); const y=d.getFullYear(),m=d.getMonth(); const val=`${y}-${pad(m+1)}`; sel.innerHTML+=`<option value="${val}"${i===0?' selected':''}>${TH_M_FULL[m]} ${y+543}</option>`; }
 }
-window.onload = async function() { buildMonthOptions(); await loadData(); };
+window.onload = async function() { buildMonthOptions(); await loadData(); if(window.Loader)Loader.hide(); };
 async function loadData() {
   document.getElementById('result-area').innerHTML='<div class="loading-row"><span class="spinner"></span> กำลังโหลด...</div>';
   document.getElementById('summary-row').style.display='none';

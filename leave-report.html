@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 <script src="js/api-config.js"></script>
 <script src="js/cache.js"></script>
+<script src="js/loader.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
@@ -506,7 +507,7 @@ function setReportMode(mode){
   if(dataLoaded) renderReport();
 }
 
-window.onload = async function(){
+window.onload = async function(){ var __hid=false; var __hideOnce=function(){if(!__hid){__hid=true;if(window.Loader)Loader.hide();}};
   buildTypeChecks();
   document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
   const now=new Date(),y=now.getFullYear(),m=now.getMonth();
@@ -536,7 +537,7 @@ window.onload = async function(){
   if(urlSearch) document.getElementById('f-search').value = urlSearch;
   // ถ้ามี param มา ให้โหลดและแสดงเลย
   if(urlDept || urlSearch) {
-    await loadData(false);
+    await loadData(false); __hideOnce();
     return; // loadData จะเรียก renderReport เอง
   }
 

@@ -8,6 +8,7 @@
 <script src="js/api-config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
+<script src="js/loader.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
 :root {
@@ -291,7 +292,7 @@ function showDetail(dateKey,list) {
   panel.innerHTML=html;
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-loadData();
+loadData().then(function(){if(window.Loader)Loader.hide();});
 </script>
 
 <button id="dm-btn" title="สลับ Dark/Light Mode" aria-label="Toggle dark mode">🌙</button>

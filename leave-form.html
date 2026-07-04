@@ -8,6 +8,7 @@
 <script src="js/api-config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
+<script src="js/loader.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
 :root {
@@ -405,7 +406,7 @@ const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเ�
 function thDate(s) { if (!s) return '-'; const [y,m,d] = s.split('-'); if (!y||!m||!d) return s; return `${+d} ${TH_M[+m]} ${+y+543}`; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 (function(){ const t = new Date().toISOString().split('T')[0]; document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();
-window.onload = initLoad;
+window.onload = async function(){ await initLoad(); if(window.Loader)Loader.hide(); };
 async function initLoad() {
   if (!API) { showToast('❌ ยังไม่ตั้งค่า API URL', 'error'); return; }
   try {

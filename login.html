@@ -6,6 +6,7 @@
 <title>เข้าสู่ระบบ · ระบบจำหน่ายบุคลากร</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 <script src="js/api-config.js"></script>
+<script src="js/loader.js"></script>
 <style>
 :root {
   --bg: #f4f6fb;
@@ -418,6 +419,9 @@ async function doLogin(){
       document.getElementById('successUnit').textContent = data.unitName;
       document.getElementById('successOverlay').classList.add('show');
 
+      // เริ่ม preload ข้อมูลระหว่างรอ redirect — พอไปถึงหน้าอื่น cache พร้อมแล้ว
+      if(window.DataCache) DataCache.preload();
+
       // Redirect after delay
       setTimeout(() => { window.location.href = 'index.html'; }, 1800);
     } else {
@@ -442,5 +446,6 @@ function showError(){
   setTimeout(()=>{ boxes.forEach(b => b.value=''); updateFilled(); boxes[0].focus(); }, 800);
 }
 </script>
+<script>if(window.Loader)Loader.hide();</script>
 </body>
 </html>
