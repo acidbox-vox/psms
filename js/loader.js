@@ -141,6 +141,22 @@
       ctx.fill(); ctx.shadowBlur = 0;
     }
 
+    /* START / TARGET — วาดก่อนเส้น path ไม่ให้ glow ทับกัน */
+    [[si, '#3b7cf4', 'START'], [ei, '#10b981', 'TARGET']].forEach(function (m) {
+      var n = nodes[m[0]];
+      /* วงนอก glow อ่อนๆ */
+      ctx.beginPath(); ctx.arc(n.x, n.y, 11, 0, 6.28);
+      ctx.fillStyle = m[1].replace(')', ',0.15)').replace('rgb', 'rgba');
+      ctx.fill();
+      /* จุดหลัก — glow พอดี ไม่สว่างวาบ */
+      ctx.beginPath(); ctx.arc(n.x, n.y, 7, 0, 6.28);
+      ctx.fillStyle = m[1]; ctx.shadowColor = m[1]; ctx.shadowBlur = 10;
+      ctx.fill(); ctx.shadowBlur = 0;
+      ctx.font = 'bold 9px monospace';
+      ctx.fillStyle = dark ? '#ffffff' : '#1a2340';
+      ctx.textAlign = 'center'; ctx.fillText(m[2], n.x, n.y - 15);
+    });
+
     /* Dijkstra path */
     if ((s.dijkPR || 0) > 0 && dijkP.length > 1) {
       var pr = Math.min(Math.floor(s.dijkPR), dijkP.length - 1);
@@ -148,7 +164,7 @@
       ctx.moveTo(nodes[dijkP[0]].x, nodes[dijkP[0]].y);
       for (var i = 1; i <= pr; i++) ctx.lineTo(nodes[dijkP[i]].x, nodes[dijkP[i]].y);
       ctx.strokeStyle = '#3b7cf4'; ctx.lineWidth = 2.5;
-      ctx.shadowColor = '#3b7cf4'; ctx.shadowBlur = 18;
+      ctx.shadowColor = '#3b7cf4'; ctx.shadowBlur = 10;
       ctx.stroke(); ctx.shadowBlur = 0;
     }
 
@@ -159,20 +175,9 @@
       ctx.moveTo(nodes[aP[0]].x, nodes[aP[0]].y);
       for (var i = 1; i <= pr; i++) ctx.lineTo(nodes[aP[i]].x, nodes[aP[i]].y);
       ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2.5;
-      ctx.shadowColor = '#7c3aed'; ctx.shadowBlur = 18;
+      ctx.shadowColor = '#7c3aed'; ctx.shadowBlur = 10;
       ctx.stroke(); ctx.shadowBlur = 0;
     }
-
-    /* START / TARGET */
-    [[si, '#3b7cf4', 'START'], [ei, '#10b981', 'TARGET']].forEach(function (m) {
-      var n = nodes[m[0]];
-      ctx.beginPath(); ctx.arc(n.x, n.y, 8, 0, 6.28);
-      ctx.fillStyle = m[1]; ctx.shadowColor = m[1]; ctx.shadowBlur = 22;
-      ctx.fill(); ctx.shadowBlur = 0;
-      ctx.font = 'bold 9px monospace';
-      ctx.fillStyle = dark ? '#ffffff' : '#1a2340';
-      ctx.textAlign = 'center'; ctx.fillText(m[2], n.x, n.y - 14);
-    });
 
     /* animate phases — ผูกกับ _dataReady ไม่ให้ path ถึง TARGET ก่อนข้อมูลมา */
     if (s.phase === 'explore') {
