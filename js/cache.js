@@ -2,6 +2,12 @@
 //  Data Cache — ลด GAS round-trip โดยเก็บข้อมูลใน sessionStorage
 //  TTL 3 นาที — หมดอายุแล้วค่อยดึงใหม่
 //  หน้า index จะ preload ล่วงหน้า หน้าอื่นๆ ใช้จาก cache ทันที
+//
+//  getDepts และ getLeaves เป็นคนละคำขอ แยกอิสระจากกันโดยตั้งใจ:
+//  แผนก + รายชื่อคนในแผนก มาจาก getDepts() ล้วนๆ ส่วน getLeaves()
+//  (ประวัติการลาทั้งหมด) ใช้แค่ตอนเช็ควันซ้ำ/บันทึกเท่านั้น จึงไม่ควร
+//  ให้แผนกต้องรอ getLeaves() โหลดเสร็จก่อน — ปล่อยให้ getLeaves()
+//  วิ่งเบื้องหลังแยกไปเลย จะได้ไม่ไปถ่วงเวลาที่ผู้ใช้เห็น dropdown
 // ============================================================
 (function(global){
   const TTL = 3 * 60 * 1000; // 3 นาที
@@ -26,7 +32,7 @@
     ['cache_leaves','cache_depts'].forEach(k => sessionStorage.removeItem(k));
   }
 
-  // ดึง leaves — ใช้ cache ถ้ายังไม่หมดอายุ
+  // ดึง leaves — ใช้ cache ถ้ายังไม่หมดอายุ (แยกอิสระจาก getDepts)
   async function getLeaves(force) {
     if (!force) {
       const cached = _get('cache_leaves');
@@ -38,7 +44,7 @@
     return data;
   }
 
-  // ดึง depts — ใช้ cache ถ้ายังไม่หมดอายุ
+  // ดึง depts — ใช้ cache ถ้ายังไม่หมดอายุ (แยกอิสระจาก getLeaves)
   async function getDepts(force) {
     if (!force) {
       const cached = _get('cache_depts');
@@ -50,9 +56,8 @@
     return data;
   }
 
-  // Preload ทั้งคู่พร้อมกัน (เรียกจากหน้า index)
+  // Preload ทั้งคู่พร้อมกัน (เรียกจากหน้า index / login) — ยิงคู่ขนาน
   async function preload() {
-    // ถ้า cache ยังใช้ได้ทั้งคู่ ไม่ต้องดึงใหม่
     if (_get('cache_leaves') && _get('cache_depts')) return;
     try {
       await Promise.all([getLeaves(true), getDepts(true)]);
