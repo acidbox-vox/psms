@@ -376,7 +376,8 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 
   <div class="card" id="time-card" style="display:none">
     <div class="card-lbl"><span class="clbl-dot">🕐</span>ช่วงเวลารับเสด็จ</div>
-    <div class="type-grid" style="grid-template-columns:repeat(2,1fr)">
+    <div class="type-grid" style="grid-template-columns:repeat(3,1fr)">
+      <button class="time-btn" id="tm-03-07" onclick="selTime('03.00 - 07.00')">🌙 03.00 - 07.00</button>
       <button class="time-btn" id="tm-08-16" onclick="selTime('08.00 - 16.00')">☀️ 08.00 - 16.00</button>
       <button class="time-btn" id="tm-16-20" onclick="selTime('16.00 - 20.00')">🌆 16.00 - 20.00</button>
     </div>
@@ -502,14 +503,15 @@ function selType(t) {
   TYPES.forEach(x=>{ const b=document.getElementById('tb-'+x); b.className=`type-btn t-${x}`+(x===t?` sel-${x}`:''); });
   const timeCard = document.getElementById('time-card');
   if (t === 'รับเสด็จ') { timeCard.style.display=''; }
-  else { timeCard.style.display='none'; selectedTime=''; document.getElementById('f-time').value=''; ['tm-08-16','tm-16-20'].forEach(id=>document.getElementById(id).className='time-btn'); }
+  else { timeCard.style.display='none'; selectedTime=''; document.getElementById('f-time').value=''; TIME_IDS.forEach(id=>document.getElementById(id).className='time-btn'); }
   onFieldChange();
 }
+const TIME_SLOTS = ['03.00 - 07.00','08.00 - 16.00','16.00 - 20.00'];
+const TIME_IDS   = ['tm-03-07','tm-08-16','tm-16-20'];
 function selTime(t) {
   selectedTime = t;
   document.getElementById('f-time').value = t;
-  document.getElementById('tm-08-16').className = 'time-btn'+(t==='08.00 - 16.00'?' sel':'');
-  document.getElementById('tm-16-20').className = 'time-btn'+(t==='16.00 - 20.00'?' sel':'');
+  TIME_SLOTS.forEach((s,i)=>{ document.getElementById(TIME_IDS[i]).className = 'time-btn'+(t===s?' sel':''); });
   onFieldChange();
 }
 function isTypeReady() {
@@ -604,7 +606,7 @@ function resetForm(keepDept) {
   document.getElementById('f-type').value='';
   TYPES.forEach(x=>document.getElementById('tb-'+x).className=`type-btn t-${x}`);
   selectedTime=''; document.getElementById('f-time').value=''; document.getElementById('time-card').style.display='none';
-  ['tm-08-16','tm-16-20'].forEach(id=>document.getElementById(id).className='time-btn');
+  TIME_IDS.forEach(id=>document.getElementById(id).className='time-btn');
   const t=new Date().toISOString().split('T')[0]; document.getElementById('f-from').value=t; document.getElementById('f-to').value=t;
   document.getElementById('preview').className=''; document.getElementById('check-status').className=''; document.getElementById('check-status').innerHTML='';
   document.getElementById('multi-progress').className=''; document.getElementById('btn-save').disabled=true;
