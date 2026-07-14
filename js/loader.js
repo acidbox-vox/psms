@@ -328,8 +328,12 @@
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href]');
     if (!a) return;
+    // ลิงก์ดาวน์โหลดไฟล์ (เช่นที่ XLSX.writeFile หรือโค้ด export สร้างขึ้นชั่วคราวเพื่อกด save)
+    // ต้องปล่อยผ่านตามปกติ ห้ามสกัด ไม่งั้นไฟล์ที่ได้จะไม่มีชื่อ/นามสกุล และ Loader จะค้างเพราะไม่มีหน้าใหม่ให้ซ่อนมันอีก
+    if (a.hasAttribute('download')) return;
     var href = a.getAttribute('href');
-    if (!href || href.charAt(0) === '#' || href.indexOf('javascript') === 0 || href.indexOf('http') === 0) return;
+    if (!href || href.charAt(0) === '#' || href.indexOf('javascript') === 0 || href.indexOf('http') === 0 ||
+        href.indexOf('blob:') === 0 || href.indexOf('data:') === 0) return;
     e.preventDefault();
     window.Loader.show();
     setTimeout(function () { window.location.href = href; }, 950);
