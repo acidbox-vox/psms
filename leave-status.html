@@ -150,6 +150,7 @@ tbody td { padding: 9px 14px; font-size: 0.86em; color: var(--text); vertical-al
 .b-ล่วงเวลา  { background: rgba(5,150,105,0.08);   color: #059669; border: 1px solid rgba(5,150,105,0.2); }
 .b-อื่นๆ     { background: rgba(217,119,6,0.08);   color: #d97706; border: 1px solid rgba(217,119,6,0.2); }
 .b-เวร       { background: rgba(8,145,178,0.08);   color: #0891b2; border: 1px solid rgba(8,145,178,0.2); }
+.b-รับเสด็จ  { background: rgba(219,39,119,0.08);  color: #db2777; border: 1px solid rgba(219,39,119,0.2); }
 .dept-tag { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--bg2); font-size: 0.78em; color: var(--text2); border: 1px solid var(--border); }
 .days-pill { display: inline-block; padding: 2px 7px; border-radius: 5px; background: var(--bg); font-size: 0.78em; color: var(--text3); font-weight: 700; border: 1px solid var(--border); }
 .fw6 { font-weight: 600; }
@@ -344,8 +345,8 @@ const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 let allData = [];
 let dataLoaded = false;
 const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌' };
-const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ'];
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
+const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ','รับเสด็จ'];
 function thDate(s) {
   if (!s||s==='undefined'||s==='null'||s==='-') return '-';
   s = String(s).trim();

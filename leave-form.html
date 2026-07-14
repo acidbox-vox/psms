@@ -162,12 +162,14 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 .t-ล่วงเวลา .ti  { color: #059669; }
 .t-อื่นๆ .ti     { color: #d97706; }
     .t-เวร .ti       { color: #0891b2; }
+.t-รับเสด็จ .ti  { color: #db2777; }
 .sel-ลา        { background: rgba(239,68,68,0.08);   border-color: rgba(239,68,68,0.4);   color: #dc2626; }
 .sel-ศึกษา     { background: rgba(124,58,237,0.08);  border-color: rgba(124,58,237,0.4);  color: #7c3aed; }
 .sel-ราชการ    { background: rgba(59,124,244,0.08);  border-color: rgba(59,124,244,0.4);  color: var(--blue); }
 .sel-ล่วงเวลา  { background: rgba(5,150,105,0.08);   border-color: rgba(5,150,105,0.4);   color: #059669; }
 .sel-อื่นๆ     { background: rgba(217,119,6,0.08);   border-color: rgba(217,119,6,0.4);   color: #d97706; }
 .sel-เวร       { background: rgba(8,145,178,0.08);   border-color: rgba(8,145,178,0.4);   color: #0891b2; }
+.sel-รับเสด็จ  { background: rgba(219,39,119,0.08);  border-color: rgba(219,39,119,0.4);  color: #db2777; }
 
 .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .date-row > div > span { display: block; margin-bottom: 6px; }
@@ -359,6 +361,7 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
       <button class="type-btn t-ล่วงเวลา"  id="tb-ล่วงเวลา"  onclick="selType('ล่วงเวลา')"> <span class="ti">⏰</span>ล่วงเวลา</button>
       <button class="type-btn t-เวร"       id="tb-เวร"       onclick="selType('เวร')">      <span class="ti">🌙</span>เวร</button>
       <button class="type-btn t-อื่นๆ"     id="tb-อื่นๆ"     onclick="selType('อื่นๆ')">    <span class="ti">📌</span>อื่นๆ</button>
+      <button class="type-btn t-รับเสด็จ"  id="tb-รับเสด็จ"  onclick="selType('รับเสด็จ')"><span class="ti">👑</span>รับเสด็จ</button>
     </div>
     <input type="hidden" id="f-type" value="">
   </div>
@@ -401,8 +404,8 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 let deptMap = {}, allLeaves = [], checkTimer = null, currentMode = 'single', selectedNames = [];
 const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌' };
-const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ'];
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
+const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ','รับเสด็จ'];
 function thDate(s) { if (!s) return '-'; const [y,m,d] = s.split('-'); if (!y||!m||!d) return s; return `${+d} ${TH_M[+m]} ${+y+543}`; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 (function(){ const t = new Date().toISOString().split('T')[0]; document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();

@@ -116,6 +116,7 @@ body::after {
 .dot-ล่วงเวลา  { background: #059669; }
 .dot-อื่นๆ     { background: #d97706; }
 .dot-เวร       { background: #0891b2; }
+.dot-รับเสด็จ  { background: #db2777; }
 .busy-count {
   position: absolute; top: 5px; right: 6px;
   font-size: 0.64em; font-weight: 800;
@@ -145,6 +146,7 @@ body::after {
 .dt-ล่วงเวลา  { background: rgba(5,150,105,0.08);   color: #059669; }
 .dt-อื่นๆ     { background: rgba(217,119,6,0.08);   color: #d97706; }
 .dt-เวร       { background: rgba(8,145,178,0.08);   color: #0891b2; }
+.dt-รับเสด็จ  { background: rgba(219,39,119,0.08);  color: #db2777; }
 
 .loading-row { text-align: center; padding: 44px; color: var(--text3); font-size: .9em; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .spinner { width: 15px; height: 15px; border: 2px solid rgba(59,124,244,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
@@ -235,8 +237,8 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 const TH_M_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-const DOT_COLOR = { 'ลา':'dot-ลา','ศึกษา':'dot-ศึกษา','ราชการ':'dot-ราชการ','ล่วงเวลา':'dot-ล่วงเวลา','เวร':'dot-เวร','อื่นๆ':'dot-อื่นๆ' };
-const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌' };
+const DOT_COLOR = { 'ลา':'dot-ลา','ศึกษา':'dot-ศึกษา','ราชการ':'dot-ราชการ','ล่วงเวลา':'dot-ล่วงเวลา','เวร':'dot-เวร','อื่นๆ':'dot-อื่นๆ','รับเสด็จ':'dot-รับเสด็จ' };
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
 let leaves = [];
 let curYear, curMonth;
 const today = new Date(); curYear = today.getFullYear(); curMonth = today.getMonth();
