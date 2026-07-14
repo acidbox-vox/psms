@@ -414,6 +414,8 @@ function dayCount(a,b){
   return Math.round((db-da)/86400000)+1;
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
+function timeOfType(t){ if(!t) return ''; const i=String(t).indexOf('|'); return i>-1?t.slice(i+1):''; }
 function nowTH(){
   const n=new Date(),d=n.getDate(),m=n.getMonth()+1,y=n.getFullYear()+543;
   const hh=String(n.getHours()).padStart(2,'0'),mm=String(n.getMinutes()).padStart(2,'0');
@@ -511,13 +513,14 @@ function setReportMode(mode){
 }
 
 window.onload = async function(){ var __hid=false; var __hideOnce=function(){if(!__hid){__hid=true;if(window.Loader)Loader.hide();}};
+  setTimeout(__hideOnce, 8000); // กันลูปโหลดค้าง — ซ่อน loader แน่นอนภายใน 8 วิ ไม่ว่าจะเกิดอะไรขึ้น
   buildTypeChecks();
   document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
   const now=new Date(),y=now.getFullYear(),m=now.getMonth();
   const last=new Date(y,m+1,0);
   document.getElementById('f-date-from').value=`${y}-${String(m+1).padStart(2,'0')}-01`;
   document.getElementById('f-date-to').value=`${y}-${String(m+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`;
-  if(!API) return;
+  if(!API) { __hideOnce(); return; }
   try{
     let depts=[];
     if(window.DataCache){const map=await DataCache.getDepts();depts=Object.keys(map||{}).sort();}
@@ -526,6 +529,7 @@ window.onload = async function(){ var __hid=false; var __hideOnce=function(){if(
     sel.innerHTML='<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
     depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
   }catch(e){}
+  __hideOnce(); // แผนกโหลดเสร็จแล้ว (หรือพัง) — ซ่อน loader ทันที ไม่ต้องรอส่วนอื่น
   // อ่าน mode จาก URL param (?mode=grouped)
   const urlMode = new URLSearchParams(window.location.search).get('mode');
   if(urlMode === 'grouped') setReportMode('grouped');
@@ -704,7 +708,7 @@ function filterRows(){
     // รายชื่อ
     if(selectedPeople.length && !selectedPeople.includes(r.name)) return false;
     // ประเภท
-    if(!selTypes.includes(r.leaveType)) return false;
+    if(!selTypes.includes(baseType(r.leaveType))) return false;
     // ช่วงเวลา
     const rFrom=toISO(r.dateFrom), rTo=toISO(r.dateTo||r.dateFrom);
     if(currentMode==='month' && month){
@@ -751,7 +755,7 @@ function renderReport(){
   if(!subtitle) subtitle='แสดงข้อมูลทั้งหมด';
 
   const sumCounts={};
-  TYPE_ALL.forEach(t=>sumCounts[t]=rows.filter(r=>r.leaveType===t).length);
+  TYPE_ALL.forEach(t=>sumCounts[t]=rows.filter(r=>baseType(r.leaveType)===t).length);
 
   let html=`
   <div class="rpt-header">
@@ -780,8 +784,9 @@ function renderReport(){
     const uniqueDepts = [...new Set(sorted.map(r=>r.dept).filter(Boolean))];
     const multiDept   = uniqueDepts.length > 1;
     // ตรวจประเภทที่มีในผลลัพธ์
-    const uniqueTypes = [...new Set(sorted.map(r=>r.leaveType).filter(Boolean))];
+    const uniqueTypes = [...new Set(sorted.map(r=>baseType(r.leaveType)).filter(Boolean))];
     const multiType   = uniqueTypes.length > 1;
+    const hasRoyal     = sorted.some(r=>baseType(r.leaveType)==='รับเสด็จ');
     // แถวข้อมูลสรุปบนตาราง
     const infoLines = [];
     if(!multiDept && uniqueDepts.length===1) infoLines.push(`หน่วย: ${uniqueDepts[0]}`);
@@ -807,6 +812,7 @@ function renderReport(){
         <th style="text-align:center">ชื่อ - นามสกุล</th>
         ${multiDept?'<th style="text-align:center">แผนก</th>':''}
         ${multiType?'<th style="text-align:center">ประเภท</th>':''}
+        ${hasRoyal?'<th style="text-align:center">เวลา</th>':''}
         <th style="text-align:center">วันที่ไป</th>
         <th style="text-align:center">วันที่กลับ</th>
         <th style="text-align:center">จำนวน</th>
@@ -817,7 +823,8 @@ function renderReport(){
         <td style="text-align:center" class="no-col">${pos+1}</td>
         <td style="font-weight:600">${esc(r.name||'-')}</td>
         ${multiDept?`<td><span class="dept-tag">${esc(r.dept||'-')}</span></td>`:''}
-        ${multiType?`<td><span class="badge b-${esc(r.leaveType)}">${TYPE_ICON[r.leaveType]||''} ${esc(r.leaveType)}</span></td>`:''}
+        ${multiType?`<td><span class="badge b-${esc(baseType(r.leaveType))}">${TYPE_ICON[baseType(r.leaveType)]||''} ${esc(baseType(r.leaveType))}</span></td>`:''}
+        ${hasRoyal?`<td style="text-align:center">${esc(timeOfType(r.leaveType))||'-'}</td>`:''}
         <td style="white-space:nowrap;text-align:center">${thDate(r.dateFrom)}</td>
         <td style="white-space:nowrap;text-align:center">${thDate(r.dateTo)}</td>
         <td style="text-align:center"><span class="days-pill">${days} วัน</span></td>
@@ -875,8 +882,9 @@ function renderReport(){
     // ตรวจหลายแผนก/ประเภทในโหมด grouped
     const gUniqueDepts = [...new Set(grouped.map(g=>g.dept).filter(Boolean))];
     const gMultiDept   = gUniqueDepts.length > 1;
-    const gUniqueTypes = [...new Set(grouped.map(g=>g.leaveType).filter(Boolean))];
+    const gUniqueTypes = [...new Set(grouped.map(g=>baseType(g.leaveType)).filter(Boolean))];
     const gMultiType   = gUniqueTypes.length > 1;
+    const gHasRoyal     = grouped.some(g=>baseType(g.leaveType)==='รับเสด็จ');
     const gInfoLines   = [];
     if(!gMultiDept && gUniqueDepts.length===1) gInfoLines.push(`หน่วย: ${gUniqueDepts[0]}`);
     if(!gMultiType && gUniqueTypes.length===1) gInfoLines.push(`ประเภทการจำหน่าย: ${TYPE_ICON[gUniqueTypes[0]]||''} ${gUniqueTypes[0]}`);
@@ -901,6 +909,7 @@ function renderReport(){
         <th style="text-align:center">ชื่อ - นามสกุล</th>
         ${gMultiDept?'<th style="text-align:center">แผนก</th>':''}
         ${gMultiType?'<th style="text-align:center">ประเภท</th>':''}
+        ${gHasRoyal?'<th style="text-align:center">เวลา</th>':''}
         <th style="text-align:center">วันที่จำหน่าย</th>
         <th style="text-align:center">รวม</th>
       </tr></thead><tbody>`;
@@ -916,7 +925,8 @@ function renderReport(){
         <td style="text-align:center" class="no-col">${pos+1}</td>
         <td style="font-weight:600">${esc(g.name)}</td>
         ${gMultiDept?`<td><span class="dept-tag">${esc(g.dept)}</span></td>`:''}
-        ${gMultiType?`<td><span class="badge b-${esc(g.leaveType)}">${TYPE_ICON[g.leaveType]||''} ${esc(g.leaveType)}</span></td>`:''}
+        ${gMultiType?`<td><span class="badge b-${esc(baseType(g.leaveType))}">${TYPE_ICON[baseType(g.leaveType)]||''} ${esc(baseType(g.leaveType))}</span></td>`:''}
+        ${gHasRoyal?`<td style="text-align:center">${esc(timeOfType(g.leaveType))||'-'}</td>`:''}
         <td style="font-size:.83em;color:var(--text2)">${esc(dateLabel)}</td>
         <td style="text-align:center"><span class="days-pill">${dates.length} วัน</span></td>
       </tr>`;
@@ -966,9 +976,10 @@ function exportExcel(){
   indexed.sort((a,b)=>b.idx-a.idx);
 
   const isGrouped = reportMode === 'grouped';
+  const hasRoyalEx = rows.some(r=>baseType(r.leaveType)==='รับเสด็จ');
   const headers = isGrouped
-    ? ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่จำหน่าย','รวม']
-    : ['#','ชื่อ - นามสกุล','แผนก','ประเภท','วันที่ไป','วันที่กลับ','จำนวนวัน'];
+    ? ['#','ชื่อ - นามสกุล','แผนก','ประเภท', ...(hasRoyalEx?['เวลา']:[]), 'วันที่จำหน่าย','รวม']
+    : ['#','ชื่อ - นามสกุล','แผนก','ประเภท', ...(hasRoyalEx?['เวลา']:[]), 'วันที่ไป','วันที่กลับ','จำนวนวัน'];
   // collect 11-7 pills
   const pills117=[...document.querySelectorAll('.pill-117')].map(el=>el.innerText.trim()).filter(Boolean);
   const pill117Str = pills117.length ? '11-7 เลขที่: '+pills117.join(', ') : '';
@@ -986,10 +997,10 @@ function exportExcel(){
     exGrp.sort((a,b)=>a.name.localeCompare(b.name,'th')||a.leaveType.localeCompare(b.leaveType,'th'));
     function exExp(ranges){const set=new Set();ranges.forEach(({from,to})=>{if(!from)return;let cur=new Date(from);const end=new Date(to||from);while(cur<=end){set.add(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}});return[...set].sort();}
     function exFmt(dates){if(!dates.length)return'-';const nums=dates.map(d=>+d.slice(8,10));const parts=[];let s=nums[0],p=nums[0];for(let i=1;i<nums.length;i++){if(nums[i]===p+1){p=nums[i];}else{parts.push(s===p?`${s}`:`${s}–${p}`);s=p=nums[i];}}parts.push(s===p?`${s}`:`${s}–${p}`);const THS=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const m=+dates[0].slice(5,7),y=+dates[0].slice(0,4);return`วันที่ ${parts.join(', ')} ${THS[m]} ${y+543}`;}
-    data=exGrp.map((g,i)=>[i+1,g.name,g.dept,g.leaveType,exFmt(exExp(g.ranges)),exExp(g.ranges).length+' วัน']);
+    data=exGrp.map((g,i)=>[i+1,g.name,g.dept,baseType(g.leaveType), ...(hasRoyalEx?[timeOfType(g.leaveType)||'-']:[]), exFmt(exExp(g.ranges)),exExp(g.ranges).length+' วัน']);
   } else {
     const sorted=[...rows].sort((a,b)=>(a.name||'').localeCompare(b.name||'','th'));
-    data=sorted.map((r,i)=>[i+1,r.name||'-',r.dept||'-',r.leaveType||'-',thDate(r.dateFrom),thDate(r.dateTo),dayCount(r.dateFrom,r.dateTo)+' วัน']);
+    data=sorted.map((r,i)=>[i+1,r.name||'-',r.dept||'-',baseType(r.leaveType)||'-', ...(hasRoyalEx?[timeOfType(r.leaveType)||'-']:[]), thDate(r.dateFrom),thDate(r.dateTo),dayCount(r.dateFrom,r.dateTo)+' วัน']);
   }
 
   // title rows

@@ -170,6 +170,14 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 .sel-อื่นๆ     { background: rgba(217,119,6,0.08);   border-color: rgba(217,119,6,0.4);   color: #d97706; }
 .sel-เวร       { background: rgba(8,145,178,0.08);   border-color: rgba(8,145,178,0.4);   color: #0891b2; }
 .sel-รับเสด็จ  { background: rgba(219,39,119,0.08);  border-color: rgba(219,39,119,0.4);  color: #db2777; }
+.time-btn {
+  padding: 10px 4px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--bg); color: var(--text2);
+  font-family: 'Sarabun', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .22s; text-align: center;
+}
+.time-btn:hover { border-color: var(--border-hover); color: var(--text); background: var(--surface-hover); }
+.time-btn.sel { background: rgba(219,39,119,0.08); border-color: rgba(219,39,119,0.4); color: #db2777; }
 
 .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .date-row > div > span { display: block; margin-bottom: 6px; }
@@ -366,6 +374,15 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
     <input type="hidden" id="f-type" value="">
   </div>
 
+  <div class="card" id="time-card" style="display:none">
+    <div class="card-lbl"><span class="clbl-dot">🕐</span>ช่วงเวลารับเสด็จ</div>
+    <div class="type-grid" style="grid-template-columns:repeat(2,1fr)">
+      <button class="time-btn" id="tm-08-16" onclick="selTime('08.00 - 16.00')">☀️ 08.00 - 16.00</button>
+      <button class="time-btn" id="tm-16-20" onclick="selTime('16.00 - 20.00')">🌆 16.00 - 20.00</button>
+    </div>
+    <input type="hidden" id="f-time" value="">
+  </div>
+
   <div class="card">
     <div class="card-lbl"><span class="clbl-dot">📅</span>ช่วงวันที่</div>
     <div class="date-row">
@@ -405,6 +422,8 @@ const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 let deptMap = {}, allLeaves = [], checkTimer = null, currentMode = 'single', selectedNames = [];
 const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
+function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
+function fmtType(t){ if(!t) return '-'; const i=String(t).indexOf('|'); return i>-1?`${t.slice(0,i)} (${t.slice(i+1)})`:t; }
 const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ','รับเสด็จ'];
 function thDate(s) { if (!s) return '-'; const [y,m,d] = s.split('-'); if (!y||!m||!d) return s; return `${+d} ${TH_M[+m]} ${+y+543}`; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -477,28 +496,49 @@ function renderSelectedTags() {
   sec.style.display='';
   wrap.innerHTML = selectedNames.map(n=>`<span class="sel-tag">${esc(n)}<span class="rm" onclick="toggleName('${esc(n)}')">×</span></span>`).join('');
 }
+let selectedTime = '';
 function selType(t) {
   document.getElementById('f-type').value = t;
   TYPES.forEach(x=>{ const b=document.getElementById('tb-'+x); b.className=`type-btn t-${x}`+(x===t?` sel-${x}`:''); });
+  const timeCard = document.getElementById('time-card');
+  if (t === 'รับเสด็จ') { timeCard.style.display=''; }
+  else { timeCard.style.display='none'; selectedTime=''; document.getElementById('f-time').value=''; ['tm-08-16','tm-16-20'].forEach(id=>document.getElementById(id).className='time-btn'); }
   onFieldChange();
+}
+function selTime(t) {
+  selectedTime = t;
+  document.getElementById('f-time').value = t;
+  document.getElementById('tm-08-16').className = 'time-btn'+(t==='08.00 - 16.00'?' sel':'');
+  document.getElementById('tm-16-20').className = 'time-btn'+(t==='16.00 - 20.00'?' sel':'');
+  onFieldChange();
+}
+function isTypeReady() {
+  const type=document.getElementById('f-type').value;
+  if (!type) return false;
+  if (type==='รับเสด็จ' && !selectedTime) return false;
+  return true;
+}
+function typeToSave() {
+  const type=document.getElementById('f-type').value;
+  return type==='รับเสด็จ' ? type+'|'+selectedTime : type;
 }
 function onFieldChange() {
   clearTimeout(checkTimer); updatePreviewBasic();
-  const type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
+  const from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, typeReady=isTypeReady();
   if (currentMode==='single') {
     const name=document.getElementById('f-name').value;
-    if (name&&from&&to&&type) checkTimer=setTimeout(async()=>{ if(leavesLoadPromise) await leavesLoadPromise; checkDuplicate(name,from,to); },300);
+    if (name&&from&&to&&typeReady) checkTimer=setTimeout(async()=>{ if(leavesLoadPromise) await leavesLoadPromise; checkDuplicate(name,from,to); },300);
     else setCheckStatus('','');
   } else {
-    const ready=selectedNames.length>0&&from&&to&&type;
+    const ready=selectedNames.length>0&&from&&to&&typeReady;
     document.getElementById('btn-save').disabled=!ready;
     if (!ready) setCheckStatus('',''); else setCheckStatus('ok',`✅ พร้อมบันทึก ${selectedNames.length} คน`);
   }
 }
 function checkDuplicate(name,newFrom,newTo) {
   const conflicts=allLeaves.filter(r=>{ if(r.name!==name) return false; if(!r.dateFrom||!r.dateTo) return false; return newFrom<=r.dateTo&&newTo>=r.dateFrom; });
-  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${c.leaveType}: ${range}`; }).join('\n'); setCheckStatus('err',`⚠️ วันที่ซ้ำกับรายการที่มีอยู่:\n${detail}`); document.getElementById('btn-save').disabled=true; }
-  else { setCheckStatus('ok','✅ วันที่ว่าง สามารถบันทึกได้'); const type=document.getElementById('f-type').value; document.getElementById('btn-save').disabled=!type; }
+  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n'); setCheckStatus('err',`⚠️ วันที่ซ้ำกับรายการที่มีอยู่:\n${detail}`); document.getElementById('btn-save').disabled=true; }
+  else { setCheckStatus('ok','✅ วันที่ว่าง สามารถบันทึกได้'); document.getElementById('btn-save').disabled=!isTypeReady(); }
 }
 function setCheckStatus(type,msg) {
   const el=document.getElementById('check-status');
@@ -508,19 +548,20 @@ function setCheckStatus(type,msg) {
 function updatePreviewBasic() {
   const type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, dept=document.getElementById('f-dept').value, box=document.getElementById('preview');
   if (currentMode==='single') {
-    const name=document.getElementById('f-name').value, ok=name&&type&&from&&to;
+    const name=document.getElementById('f-name').value, ok=name&&isTypeReady()&&from&&to;
     if (!ok) { document.getElementById('btn-save').disabled=true; box.className=''; return; }
     const dlbl=from===to?thDate(from):`${thDate(from)} → ${thDate(to)}`;
-    box.innerHTML=`<strong>${TYPE_ICON[type]||''} ${esc(type)}</strong><br>👤 ${esc(name)} <span style="color:var(--text3)">· ${esc(dept)}</span><br>📅 ${dlbl}`;
+    const typeLbl = type==='รับเสด็จ'&&selectedTime ? `${type} (${selectedTime})` : type;
+    box.innerHTML=`<strong>${TYPE_ICON[type]||''} ${esc(typeLbl)}</strong><br>👤 ${esc(name)} <span style="color:var(--text3)">· ${esc(dept)}</span><br>📅 ${dlbl}`;
     box.className='show';
   } else { box.className=''; }
 }
 async function doSave() { if (currentMode==='single') await doSaveSingle(); else await doSaveMulti(); }
 async function doSaveSingle() {
   if (leavesLoadPromise) await leavesLoadPromise;
-  const name=document.getElementById('f-name').value, dept=document.getElementById('f-dept').value, type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
+  const name=document.getElementById('f-name').value, dept=document.getElementById('f-dept').value, type=typeToSave(), from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
   const conflicts=allLeaves.filter(r=>{ if(r.name!==name) return false; if(!r.dateFrom||!r.dateTo) return false; return from<=r.dateTo&&to>=r.dateFrom; });
-  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${c.leaveType}: ${range}`; }).join('\n'); document.getElementById('modal-msg').innerText=`${name} มีรายการที่วันที่ซ้ำกันอยู่แล้ว:\n${detail}`; document.getElementById('modal').classList.add('show'); return; }
+  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n'); document.getElementById('modal-msg').innerText=`${name} มีรายการที่วันที่ซ้ำกันอยู่แล้ว:\n${detail}`; document.getElementById('modal').classList.add('show'); return; }
   const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML='⏳ กำลังบันทึก...';
   try {
     const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'saveLeave',dept,name,leaveType:type,dateFrom:from,dateTo:to})});
@@ -533,7 +574,7 @@ async function doSaveSingle() {
 }
 async function doSaveMulti() {
   if (leavesLoadPromise) await leavesLoadPromise;
-  const dept=document.getElementById('f-dept').value, type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, names=[...selectedNames];
+  const dept=document.getElementById('f-dept').value, type=typeToSave(), from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, names=[...selectedNames];
   const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML=`⏳ กำลังบันทึก 0/${names.length}...`;
   const prog=document.getElementById('multi-progress'); prog.innerHTML=`<b>กำลังบันทึก ${names.length} คน...</b><br>`; prog.className='show';
   let okCount=0;
@@ -562,6 +603,8 @@ function resetForm(keepDept) {
   renderSelectedTags();
   document.getElementById('f-type').value='';
   TYPES.forEach(x=>document.getElementById('tb-'+x).className=`type-btn t-${x}`);
+  selectedTime=''; document.getElementById('f-time').value=''; document.getElementById('time-card').style.display='none';
+  ['tm-08-16','tm-16-20'].forEach(id=>document.getElementById(id).className='time-btn');
   const t=new Date().toISOString().split('T')[0]; document.getElementById('f-from').value=t; document.getElementById('f-to').value=t;
   document.getElementById('preview').className=''; document.getElementById('check-status').className=''; document.getElementById('check-status').innerHTML='';
   document.getElementById('multi-progress').className=''; document.getElementById('btn-save').disabled=true;

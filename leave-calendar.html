@@ -239,6 +239,8 @@ const TH_M_FULL = ['มกราคม','กุมภาพันธ์','มี
 const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const DOT_COLOR = { 'ลา':'dot-ลา','ศึกษา':'dot-ศึกษา','ราชการ':'dot-ราชการ','ล่วงเวลา':'dot-ล่วงเวลา','เวร':'dot-เวร','อื่นๆ':'dot-อื่นๆ','รับเสด็จ':'dot-รับเสด็จ' };
 const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
+function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
+function fmtType(t){ if(!t) return '-'; const i=String(t).indexOf('|'); return i>-1?`${t.slice(0,i)} (${t.slice(i+1)})`:t; }
 let leaves = [];
 let curYear, curMonth;
 const today = new Date(); curYear = today.getFullYear(); curMonth = today.getMonth();
@@ -280,7 +282,7 @@ function buildCalendar() {
     if (dow===0) cls+=' sunday'; if (dow===6) cls+=' saturday';
     cell.className=cls;
     let inner=`<div class="day-num">${d}</div>`;
-    if (found.length>0) { inner+=`<div class="busy-count">${found.length}</div><div class="dot-row">`; found.forEach(l=>{inner+=`<div class="dot ${DOT_COLOR[l.leaveType]||''}"></div>`;}); inner+='</div>'; }
+    if (found.length>0) { inner+=`<div class="busy-count">${found.length}</div><div class="dot-row">`; found.forEach(l=>{inner+=`<div class="dot ${DOT_COLOR[baseType(l.leaveType)]||''}"></div>`;}); inner+='</div>'; }
     cell.innerHTML=inner; cell.onclick=()=>showDetail(key,found); grid.appendChild(cell);
   }
 }
@@ -290,7 +292,7 @@ function showDetail(dateKey,list) {
   const dLabel=`${+parts[2]} ${TH_M_SHORT[+parts[1]]} ${+parts[0]+543}`;
   if (list.length===0) { panel.innerHTML=`<div class="detail-date">📅 ${dLabel}</div><div class="detail-empty">ไม่มีรายการในวันนี้</div>`; return; }
   let html=`<div class="detail-date">📅 ${dLabel} — ${list.length} คน</div>`;
-  list.forEach(l=>{ html+=`<div class="detail-row"><div class="detail-dot ${DOT_COLOR[l.leaveType]||''}"></div><div style="flex:1"><div class="detail-name">${esc(l.name)}</div><div class="detail-dept">${esc(l.dept||'-')}</div></div><div class="detail-type dt-${l.leaveType}">${TYPE_ICON[l.leaveType]||''} ${esc(l.leaveType)}</div></div>`; });
+  list.forEach(l=>{ html+=`<div class="detail-row"><div class="detail-dot ${DOT_COLOR[baseType(l.leaveType)]||''}"></div><div style="flex:1"><div class="detail-name">${esc(l.name)}</div><div class="detail-dept">${esc(l.dept||'-')}</div></div><div class="detail-type dt-${baseType(l.leaveType)}">${TYPE_ICON[baseType(l.leaveType)]||''} ${esc(fmtType(l.leaveType))}</div></div>`; });
   panel.innerHTML=html;
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
