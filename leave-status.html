@@ -56,7 +56,7 @@ body::after {
 @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
 
 /* Stats */
-.stats-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
+.stats-row { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; margin-bottom: 12px; }
 .stat-card {
   background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px;
   padding: 12px 8px; text-align: center; box-shadow: var(--shadow);
@@ -72,6 +72,8 @@ body::after {
 .sc-other .sn  { color: #d97706; }
 .sc-duty .sn   { color: #0891b2; }
 .sc-royal .sn  { color: #db2777; }
+.sc-ot-hosp .sn{ color: #ea580c; }
+.sc-off-hosp .sn{ color: #4f46e5; }
 
 /* Filter bar */
 .filter-bar {
@@ -152,6 +154,8 @@ tbody td { padding: 9px 14px; font-size: 0.86em; color: var(--text); vertical-al
 .b-อื่นๆ     { background: rgba(217,119,6,0.08);   color: #d97706; border: 1px solid rgba(217,119,6,0.2); }
 .b-เวร       { background: rgba(8,145,178,0.08);   color: #0891b2; border: 1px solid rgba(8,145,178,0.2); }
 .b-รับเสด็จ  { background: rgba(219,39,119,0.08);  color: #db2777; border: 1px solid rgba(219,39,119,0.2); }
+.b-ot-hosp   { background: rgba(234,88,12,0.08);   color: #ea580c; border: 1px solid rgba(234,88,12,0.2); }
+.b-off-hosp  { background: rgba(79,70,229,0.08);   color: #4f46e5; border: 1px solid rgba(79,70,229,0.2); }
 .dept-tag { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--bg2); font-size: 0.78em; color: var(--text2); border: 1px solid var(--border); }
 .days-pill { display: inline-block; padding: 2px 7px; border-radius: 5px; background: var(--bg); font-size: 0.78em; color: var(--text3); font-weight: 700; border: 1px solid var(--border); }
 .fw6 { font-weight: 600; }
@@ -276,6 +280,8 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
     <div class="stat-card sc-duty"><div class="sn" id="s-เวร">—</div>   <div class="sl">เวร</div></div>
     <div class="stat-card sc-other"><div class="sn" id="s-อื่นๆ">—</div>  <div class="sl">อื่นๆ</div></div>
     <div class="stat-card sc-royal"><div class="sn" id="s-รับเสด็จ">—</div><div class="sl">รับเสด็จ</div></div>
+    <div class="stat-card sc-ot-hosp"><div class="sn" id="s-ot-hosp">—</div><div class="sl">OT รพ.</div></div>
+    <div class="stat-card sc-off-hosp"><div class="sn" id="s-off-hosp">—</div><div class="sl">นอกเวลา รพ.</div></div>
   </div>
 
   <div class="filter-bar">
@@ -347,8 +353,10 @@ const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 let allData = [];
 let dataLoaded = false;
 const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
-const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ','รับเสด็จ'];
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑','ล่วงเวลาเฉพาะ รพ.':'🏥','นอกเวลาเฉพาะ รพ.':'🌇' };
+const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ','รับเสด็จ','ล่วงเวลาเฉพาะ รพ.','นอกเวลาเฉพาะ รพ.'];
+const TYPE_SLUG = { 'ล่วงเวลาเฉพาะ รพ.':'ot-hosp', 'นอกเวลาเฉพาะ รพ.':'off-hosp' };
+function slug(t){ return TYPE_SLUG[t] || t; }
 function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
 function fmtType(t){ if(!t) return '-'; const i=String(t).indexOf('|'); return i>-1?`${t.slice(0,i)} (${t.slice(i+1)})`:t; }
 function thDate(s) {
@@ -400,7 +408,7 @@ async function initPage() {
 function showPrompt() {
   document.getElementById('tbody').innerHTML =
     '<div class="empty-state"><div class="ei">🗂️</div><p>กรุณาเลือกแผนก แล้วกด <strong>แสดง</strong></p></div>';
-  TYPES.forEach(t => { document.getElementById('s-'+t).innerText = '—'; });
+  TYPES.forEach(t => { document.getElementById('s-'+slug(t)).innerText = '—'; });
   document.getElementById('t-count').innerText = '';
 }
 
@@ -477,7 +485,7 @@ function applyFilters() {
   let indexed = rows.map((r,_) => ({r, idx: allData.indexOf(r)}));
   indexed.sort((a,b) => b.idx - a.idx);
 
-  TYPES.forEach(t => { document.getElementById('s-'+t).innerText = rows.filter(r=>baseType(r.leaveType)===t).length; });
+  TYPES.forEach(t => { document.getElementById('s-'+slug(t)).innerText = rows.filter(r=>baseType(r.leaveType)===t).length; });
   document.getElementById('t-count').innerText = rows.length + ' รายการ';
 
   if (rows.length === 0) {
@@ -486,7 +494,7 @@ function applyFilters() {
   }
   let html = `<table><thead><tr><th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th><th>วันที่ไป</th><th>วันที่กลับ</th><th>จำนวน</th><th></th></tr></thead><tbody>`;
   indexed.forEach(({r,idx},pos) => {
-    const days=dayCount(r.dateFrom,r.dateTo), icon=TYPE_ICON[baseType(r.leaveType)]||'', badgeCls=`b-${baseType(r.leaveType)}`, isNewest=pos===0;
+    const days=dayCount(r.dateFrom,r.dateTo), icon=TYPE_ICON[baseType(r.leaveType)]||'', badgeCls=`b-${slug(baseType(r.leaveType))}`, isNewest=pos===0;
     html+=`<tr id="row-${idx}"><td class="fw6">${esc(r.name)}${isNewest?'<span class="new-badge">ใหม่</span>':''}</td><td><span class="dept-tag">${esc(r.dept||'-')}</span></td><td><span class="badge ${badgeCls}">${icon} ${esc(fmtType(r.leaveType))}</span></td><td class="nowrap">${thDate(r.dateFrom)}</td><td class="nowrap">${thDate(r.dateTo)}</td><td><span class="days-pill">${days} วัน</span></td><td><button class="del-btn" onclick="confirmDelete(${idx})">🗑️</button></td></tr>`;
   });
   html += '</tbody></table>';

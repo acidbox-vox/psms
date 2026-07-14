@@ -163,6 +163,8 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 .t-อื่นๆ .ti     { color: #d97706; }
     .t-เวร .ti       { color: #0891b2; }
 .t-รับเสด็จ .ti  { color: #db2777; }
+.t-ot-hosp .ti   { color: #ea580c; }
+.t-off-hosp .ti  { color: #4f46e5; }
 .sel-ลา        { background: rgba(239,68,68,0.08);   border-color: rgba(239,68,68,0.4);   color: #dc2626; }
 .sel-ศึกษา     { background: rgba(124,58,237,0.08);  border-color: rgba(124,58,237,0.4);  color: #7c3aed; }
 .sel-ราชการ    { background: rgba(59,124,244,0.08);  border-color: rgba(59,124,244,0.4);  color: var(--blue); }
@@ -170,6 +172,8 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 .sel-อื่นๆ     { background: rgba(217,119,6,0.08);   border-color: rgba(217,119,6,0.4);   color: #d97706; }
 .sel-เวร       { background: rgba(8,145,178,0.08);   border-color: rgba(8,145,178,0.4);   color: #0891b2; }
 .sel-รับเสด็จ  { background: rgba(219,39,119,0.08);  border-color: rgba(219,39,119,0.4);  color: #db2777; }
+.sel-ot-hosp   { background: rgba(234,88,12,0.08);   border-color: rgba(234,88,12,0.4);   color: #ea580c; }
+.sel-off-hosp  { background: rgba(79,70,229,0.08);   border-color: rgba(79,70,229,0.4);   color: #4f46e5; }
 .time-btn {
   padding: 10px 4px; border-radius: 10px; border: 1.5px solid var(--border);
   background: var(--bg); color: var(--text2);
@@ -370,17 +374,15 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
       <button class="type-btn t-เวร"       id="tb-เวร"       onclick="selType('เวร')">      <span class="ti">🌙</span>เวร</button>
       <button class="type-btn t-อื่นๆ"     id="tb-อื่นๆ"     onclick="selType('อื่นๆ')">    <span class="ti">📌</span>อื่นๆ</button>
       <button class="type-btn t-รับเสด็จ"  id="tb-รับเสด็จ"  onclick="selType('รับเสด็จ')"><span class="ti">👑</span>รับเสด็จ</button>
+      <button class="type-btn t-ot-hosp"   id="tb-ot-hosp"   onclick="selType('ล่วงเวลาเฉพาะ รพ.')"><span class="ti">🏥</span>ล่วงเวลาเฉพาะ รพ.</button>
+      <button class="type-btn t-off-hosp"  id="tb-off-hosp"  onclick="selType('นอกเวลาเฉพาะ รพ.')"><span class="ti">🌇</span>นอกเวลาเฉพาะ รพ.</button>
     </div>
     <input type="hidden" id="f-type" value="">
   </div>
 
   <div class="card" id="time-card" style="display:none">
-    <div class="card-lbl"><span class="clbl-dot">🕐</span>ช่วงเวลารับเสด็จ</div>
-    <div class="type-grid" style="grid-template-columns:repeat(3,1fr)">
-      <button class="time-btn" id="tm-03-07" onclick="selTime('03.00 - 07.00')">🌙 03.00 - 07.00</button>
-      <button class="time-btn" id="tm-08-16" onclick="selTime('08.00 - 16.00')">☀️ 08.00 - 16.00</button>
-      <button class="time-btn" id="tm-16-20" onclick="selTime('16.00 - 20.00')">🌆 16.00 - 20.00</button>
-    </div>
+    <div class="card-lbl"><span class="clbl-dot">🕐</span>ช่วงเวลา</div>
+    <div class="type-grid" id="time-grid" style="grid-template-columns:repeat(3,1fr)"></div>
     <input type="hidden" id="f-time" value="">
   </div>
 
@@ -422,10 +424,19 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 let deptMap = {}, allLeaves = [], checkTimer = null, currentMode = 'single', selectedNames = [];
 const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑','ล่วงเวลาเฉพาะ รพ.':'🏥','นอกเวลาเฉพาะ รพ.':'🌇' };
 function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
 function fmtType(t){ if(!t) return '-'; const i=String(t).indexOf('|'); return i>-1?`${t.slice(0,i)} (${t.slice(i+1)})`:t; }
-const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ','รับเสด็จ'];
+// slug() สร้างชื่อ class/id ที่ปลอดภัย (ไม่มีเว้นวรรค/จุด) สำหรับประเภทที่ชื่อมีอักขระพิเศษ
+const TYPE_SLUG = { 'ล่วงเวลาเฉพาะ รพ.':'ot-hosp', 'นอกเวลาเฉพาะ รพ.':'off-hosp' };
+function slug(t){ return TYPE_SLUG[t] || t; }
+const TYPES = ['ลา','ศึกษา','ราชการ','ล่วงเวลา','เวร','อื่นๆ','รับเสด็จ','ล่วงเวลาเฉพาะ รพ.','นอกเวลาเฉพาะ รพ.'];
+// ประเภทที่ต้องเลือกช่วงเวลาเพิ่ม พร้อมตัวเลือกเวลาของแต่ละประเภท
+const TIME_TYPE_SLOTS = {
+  'รับเสด็จ': ['03.00 - 07.00','08.00 - 16.00','16.00 - 20.00'],
+  'ล่วงเวลาเฉพาะ รพ.': ['08.00 - 16.00','16.00 - 24.00','00.00 - 08.00'],
+  'นอกเวลาเฉพาะ รพ.': ['16.00 - 20.00']
+};
 function thDate(s) { if (!s) return '-'; const [y,m,d] = s.split('-'); if (!y||!m||!d) return s; return `${+d} ${TH_M[+m]} ${+y+543}`; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 (function(){ const t = new Date().toISOString().split('T')[0]; document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();
@@ -500,29 +511,33 @@ function renderSelectedTags() {
 let selectedTime = '';
 function selType(t) {
   document.getElementById('f-type').value = t;
-  TYPES.forEach(x=>{ const b=document.getElementById('tb-'+x); b.className=`type-btn t-${x}`+(x===t?` sel-${x}`:''); });
-  const timeCard = document.getElementById('time-card');
-  if (t === 'รับเสด็จ') { timeCard.style.display=''; }
-  else { timeCard.style.display='none'; selectedTime=''; document.getElementById('f-time').value=''; TIME_IDS.forEach(id=>document.getElementById(id).className='time-btn'); }
+  TYPES.forEach(x=>{ const b=document.getElementById('tb-'+slug(x)); b.className=`type-btn t-${slug(x)}`+(x===t?` sel-${slug(x)}`:''); });
+  const timeCard = document.getElementById('time-card'), timeGrid = document.getElementById('time-grid');
+  const slots = TIME_TYPE_SLOTS[t];
+  selectedTime=''; document.getElementById('f-time').value='';
+  if (slots) {
+    timeCard.style.display='';
+    timeGrid.innerHTML = slots.map(s=>`<button class="time-btn" data-slot="${esc(s)}" onclick="selTime('${esc(s)}')">${esc(s)}</button>`).join('');
+  } else {
+    timeCard.style.display='none'; timeGrid.innerHTML='';
+  }
   onFieldChange();
 }
-const TIME_SLOTS = ['03.00 - 07.00','08.00 - 16.00','16.00 - 20.00'];
-const TIME_IDS   = ['tm-03-07','tm-08-16','tm-16-20'];
 function selTime(t) {
   selectedTime = t;
   document.getElementById('f-time').value = t;
-  TIME_SLOTS.forEach((s,i)=>{ document.getElementById(TIME_IDS[i]).className = 'time-btn'+(t===s?' sel':''); });
+  document.querySelectorAll('#time-grid .time-btn').forEach(b=>{ b.className='time-btn'+(b.dataset.slot===t?' sel':''); });
   onFieldChange();
 }
 function isTypeReady() {
   const type=document.getElementById('f-type').value;
   if (!type) return false;
-  if (type==='รับเสด็จ' && !selectedTime) return false;
+  if (TIME_TYPE_SLOTS[type] && !selectedTime) return false;
   return true;
 }
 function typeToSave() {
   const type=document.getElementById('f-type').value;
-  return type==='รับเสด็จ' ? type+'|'+selectedTime : type;
+  return TIME_TYPE_SLOTS[type] ? type+'|'+selectedTime : type;
 }
 function onFieldChange() {
   clearTimeout(checkTimer); updatePreviewBasic();
@@ -537,9 +552,28 @@ function onFieldChange() {
     if (!ready) setCheckStatus('',''); else setCheckStatus('ok',`✅ พร้อมบันทึก ${selectedNames.length} คน`);
   }
 }
+function parseSlotMinutes(slot) { const [a,b]=slot.split(' - '); const toMin=s=>{ const [h,m]=s.split('.').map(Number); return h*60+m; }; return [toMin(a),toMin(b)]; }
+function slotsOverlap(s1,s2) { const [a1,a2]=parseSlotMinutes(s1),[b1,b2]=parseSlotMinutes(s2); return a1<b2 && a2>b1; }
+// หาว่ารายการเดิมของ "name" รายการไหนชนกับช่วงวันที่/เวลาที่กำลังจะบันทึก (type = ค่าที่ผ่าน typeToSave() แล้ว)
+function findConflicts(name,newFrom,newTo,type) {
+  const newBase=baseType(type);
+  const newTime=(TIME_TYPE_SLOTS[newBase]&&String(type).includes('|'))?type.split('|')[1]:'';
+  return allLeaves.filter(r=>{
+    if(r.name!==name) return false;
+    if(!r.dateFrom||!r.dateTo) return false;
+    if(!(newFrom<=r.dateTo&&newTo>=r.dateFrom)) return false;
+    const cBase=baseType(r.leaveType);
+    // ถ้าทั้งสองรายการเป็นประเภทเดียวกันและมีช่วงเวลา ให้ถือว่าซ้ำก็ต่อเมื่อ "เวลา" ทับกันจริง ไม่ใช่แค่วันตรงกัน
+    if (newTime && cBase===newBase && TIME_TYPE_SLOTS[cBase]) {
+      const cTime = r.leaveType.includes('|') ? r.leaveType.split('|')[1] : '';
+      if (cTime && !slotsOverlap(newTime,cTime)) return false;
+    }
+    return true;
+  });
+}
 function checkDuplicate(name,newFrom,newTo) {
-  const conflicts=allLeaves.filter(r=>{ if(r.name!==name) return false; if(!r.dateFrom||!r.dateTo) return false; return newFrom<=r.dateTo&&newTo>=r.dateFrom; });
-  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n'); setCheckStatus('err',`⚠️ วันที่ซ้ำกับรายการที่มีอยู่:\n${detail}`); document.getElementById('btn-save').disabled=true; }
+  const conflicts=findConflicts(name,newFrom,newTo,typeToSave());
+  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n'); setCheckStatus('err',`⚠️ วันที่/เวลาซ้ำกับรายการที่มีอยู่:\n${detail}`); document.getElementById('btn-save').disabled=true; }
   else { setCheckStatus('ok','✅ วันที่ว่าง สามารถบันทึกได้'); document.getElementById('btn-save').disabled=!isTypeReady(); }
 }
 function setCheckStatus(type,msg) {
@@ -553,7 +587,7 @@ function updatePreviewBasic() {
     const name=document.getElementById('f-name').value, ok=name&&isTypeReady()&&from&&to;
     if (!ok) { document.getElementById('btn-save').disabled=true; box.className=''; return; }
     const dlbl=from===to?thDate(from):`${thDate(from)} → ${thDate(to)}`;
-    const typeLbl = type==='รับเสด็จ'&&selectedTime ? `${type} (${selectedTime})` : type;
+    const typeLbl = TIME_TYPE_SLOTS[type]&&selectedTime ? `${type} (${selectedTime})` : type;
     box.innerHTML=`<strong>${TYPE_ICON[type]||''} ${esc(typeLbl)}</strong><br>👤 ${esc(name)} <span style="color:var(--text3)">· ${esc(dept)}</span><br>📅 ${dlbl}`;
     box.className='show';
   } else { box.className=''; }
@@ -562,7 +596,7 @@ async function doSave() { if (currentMode==='single') await doSaveSingle(); else
 async function doSaveSingle() {
   if (leavesLoadPromise) await leavesLoadPromise;
   const name=document.getElementById('f-name').value, dept=document.getElementById('f-dept').value, type=typeToSave(), from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
-  const conflicts=allLeaves.filter(r=>{ if(r.name!==name) return false; if(!r.dateFrom||!r.dateTo) return false; return from<=r.dateTo&&to>=r.dateFrom; });
+  const conflicts=findConflicts(name,from,to,type);
   if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n'); document.getElementById('modal-msg').innerText=`${name} มีรายการที่วันที่ซ้ำกันอยู่แล้ว:\n${detail}`; document.getElementById('modal').classList.add('show'); return; }
   const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML='⏳ กำลังบันทึก...';
   try {
@@ -582,7 +616,7 @@ async function doSaveMulti() {
   let okCount=0;
   for (let i=0;i<names.length;i++) {
     const name=names[i]; btn.innerHTML=`⏳ กำลังบันทึก ${i+1}/${names.length}...`;
-    const dup=allLeaves.filter(r=>r.name===name&&r.dateFrom&&r.dateTo&&from<=r.dateTo&&to>=r.dateFrom);
+    const dup=findConflicts(name,from,to,type);
     if (dup.length>0) { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — วันที่ซ้ำ</div>`; continue; }
     try {
       const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'saveLeave',dept,name,leaveType:type,dateFrom:from,dateTo:to})});
@@ -604,9 +638,8 @@ function resetForm(keepDept) {
   else { document.getElementById('f-name').value=''; const dept=document.getElementById('f-dept').value; if (dept&&currentMode==='multi') buildNameList(deptMap[dept]||[]); }
   renderSelectedTags();
   document.getElementById('f-type').value='';
-  TYPES.forEach(x=>document.getElementById('tb-'+x).className=`type-btn t-${x}`);
-  selectedTime=''; document.getElementById('f-time').value=''; document.getElementById('time-card').style.display='none';
-  TIME_IDS.forEach(id=>document.getElementById(id).className='time-btn');
+  TYPES.forEach(x=>document.getElementById('tb-'+slug(x)).className=`type-btn t-${slug(x)}`);
+  selectedTime=''; document.getElementById('f-time').value=''; document.getElementById('time-card').style.display='none'; document.getElementById('time-grid').innerHTML='';
   const t=new Date().toISOString().split('T')[0]; document.getElementById('f-from').value=t; document.getElementById('f-to').value=t;
   document.getElementById('preview').className=''; document.getElementById('check-status').className=''; document.getElementById('check-status').innerHTML='';
   document.getElementById('multi-progress').className=''; document.getElementById('btn-save').disabled=true;

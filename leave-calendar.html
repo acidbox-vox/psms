@@ -117,6 +117,8 @@ body::after {
 .dot-อื่นๆ     { background: #d97706; }
 .dot-เวร       { background: #0891b2; }
 .dot-รับเสด็จ  { background: #db2777; }
+.dot-ot-hosp   { background: #ea580c; }
+.dot-off-hosp  { background: #4f46e5; }
 .busy-count {
   position: absolute; top: 5px; right: 6px;
   font-size: 0.64em; font-weight: 800;
@@ -147,6 +149,8 @@ body::after {
 .dt-อื่นๆ     { background: rgba(217,119,6,0.08);   color: #d97706; }
 .dt-เวร       { background: rgba(8,145,178,0.08);   color: #0891b2; }
 .dt-รับเสด็จ  { background: rgba(219,39,119,0.08);  color: #db2777; }
+.dt-ot-hosp   { background: rgba(234,88,12,0.08);   color: #ea580c; }
+.dt-off-hosp  { background: rgba(79,70,229,0.08);   color: #4f46e5; }
 
 .loading-row { text-align: center; padding: 44px; color: var(--text3); font-size: .9em; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .spinner { width: 15px; height: 15px; border: 2px solid rgba(59,124,244,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
@@ -237,8 +241,10 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 const TH_M_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const TH_M_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-const DOT_COLOR = { 'ลา':'dot-ลา','ศึกษา':'dot-ศึกษา','ราชการ':'dot-ราชการ','ล่วงเวลา':'dot-ล่วงเวลา','เวร':'dot-เวร','อื่นๆ':'dot-อื่นๆ','รับเสด็จ':'dot-รับเสด็จ' };
-const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑' };
+const DOT_COLOR = { 'ลา':'dot-ลา','ศึกษา':'dot-ศึกษา','ราชการ':'dot-ราชการ','ล่วงเวลา':'dot-ล่วงเวลา','เวร':'dot-เวร','อื่นๆ':'dot-อื่นๆ','รับเสด็จ':'dot-รับเสด็จ','ล่วงเวลาเฉพาะ รพ.':'dot-ot-hosp','นอกเวลาเฉพาะ รพ.':'dot-off-hosp' };
+const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑','ล่วงเวลาเฉพาะ รพ.':'🏥','นอกเวลาเฉพาะ รพ.':'🌇' };
+const TYPE_SLUG = { 'ล่วงเวลาเฉพาะ รพ.':'ot-hosp', 'นอกเวลาเฉพาะ รพ.':'off-hosp' };
+function slug(t){ return TYPE_SLUG[t] || t; }
 function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
 function fmtType(t){ if(!t) return '-'; const i=String(t).indexOf('|'); return i>-1?`${t.slice(0,i)} (${t.slice(i+1)})`:t; }
 let leaves = [];
@@ -292,7 +298,7 @@ function showDetail(dateKey,list) {
   const dLabel=`${+parts[2]} ${TH_M_SHORT[+parts[1]]} ${+parts[0]+543}`;
   if (list.length===0) { panel.innerHTML=`<div class="detail-date">📅 ${dLabel}</div><div class="detail-empty">ไม่มีรายการในวันนี้</div>`; return; }
   let html=`<div class="detail-date">📅 ${dLabel} — ${list.length} คน</div>`;
-  list.forEach(l=>{ html+=`<div class="detail-row"><div class="detail-dot ${DOT_COLOR[baseType(l.leaveType)]||''}"></div><div style="flex:1"><div class="detail-name">${esc(l.name)}</div><div class="detail-dept">${esc(l.dept||'-')}</div></div><div class="detail-type dt-${baseType(l.leaveType)}">${TYPE_ICON[baseType(l.leaveType)]||''} ${esc(fmtType(l.leaveType))}</div></div>`; });
+  list.forEach(l=>{ html+=`<div class="detail-row"><div class="detail-dot ${DOT_COLOR[baseType(l.leaveType)]||''}"></div><div style="flex:1"><div class="detail-name">${esc(l.name)}</div><div class="detail-dept">${esc(l.dept||'-')}</div></div><div class="detail-type dt-${slug(baseType(l.leaveType))}">${TYPE_ICON[baseType(l.leaveType)]||''} ${esc(fmtType(l.leaveType))}</div></div>`; });
   panel.innerHTML=html;
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
