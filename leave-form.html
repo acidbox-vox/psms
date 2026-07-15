@@ -124,7 +124,7 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 .combo-input:focus { border-color: rgba(59,124,244,0.6); background: #fff; box-shadow: 0 0 0 3px rgba(59,124,244,0.10); }
 .combo-input:disabled { opacity: 0.4; cursor: not-allowed; }
 .combo-dropdown {
-  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+  position: fixed; z-index: 1000;
   background: #fff; border: 1.5px solid var(--border); border-radius: 10px;
   max-height: 240px; overflow-y: auto; box-shadow: 0 10px 28px rgba(0,0,0,0.14);
   display: none;
@@ -522,6 +522,14 @@ function setMode(mode) {
 /* ── Combobox แผนก/ชื่อ (พิมพ์ค้นหาแบบ autocomplete) ── */
 let comboItems = { dept: [], name: [] };
 let comboHL = { dept: -1, name: -1 };
+function positionCombo(kind) {
+  const dd = document.getElementById(kind+'-dropdown');
+  const inputEl = document.getElementById('f-'+kind+'-input');
+  const r = inputEl.getBoundingClientRect();
+  dd.style.left = r.left+'px';
+  dd.style.top = (r.bottom+4)+'px';
+  dd.style.width = r.width+'px';
+}
 function renderCombo(kind, items, query) {
   const dd = document.getElementById(kind+'-dropdown');
   const q = (query||'').trim();
@@ -537,9 +545,13 @@ function renderCombo(kind, items, query) {
       el.onmousedown = (e) => { e.preventDefault(); selectCombo(kind, filtered[+el.dataset.i]); };
     });
   }
+  positionCombo(kind);
   dd.classList.add('show');
 }
 function closeCombo(kind) { document.getElementById(kind+'-dropdown').classList.remove('show'); }
+// ปิด dropdown เมื่อเลื่อนหน้าจอหรือปรับขนาดหน้าต่าง กันไม่ให้ตำแหน่งเพี้ยนเพราะเป็น position:fixed
+window.addEventListener('scroll', ()=>{ closeCombo('dept'); closeCombo('name'); }, true);
+window.addEventListener('resize', ()=>{ closeCombo('dept'); closeCombo('name'); });
 function updateComboHL(kind) {
   const dd = document.getElementById(kind+'-dropdown');
   [...dd.querySelectorAll('.combo-item')].forEach((el,i)=>{
