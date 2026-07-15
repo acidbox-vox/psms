@@ -550,7 +550,11 @@ function renderCombo(kind, items, query) {
 }
 function closeCombo(kind) { document.getElementById(kind+'-dropdown').classList.remove('show'); }
 // ปิด dropdown เมื่อเลื่อนหน้าจอหรือปรับขนาดหน้าต่าง กันไม่ให้ตำแหน่งเพี้ยนเพราะเป็น position:fixed
-window.addEventListener('scroll', ()=>{ closeCombo('dept'); closeCombo('name'); }, true);
+window.addEventListener('scroll', (e)=>{
+  // ถ้าเลื่อนอยู่ในกล่องรายการเอง (scroll ในลิสต์) ไม่ต้องปิด ปิดเฉพาะตอนเลื่อนหน้าเว็บจริงๆ
+  if (e.target && e.target.classList && e.target.classList.contains('combo-dropdown')) return;
+  closeCombo('dept'); closeCombo('name');
+}, true);
 window.addEventListener('resize', ()=>{ closeCombo('dept'); closeCombo('name'); });
 function updateComboHL(kind) {
   const dd = document.getElementById(kind+'-dropdown');
