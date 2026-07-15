@@ -111,6 +111,36 @@ select:focus, input[type="date"]:focus {
 }
 select:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Searchable combobox (แผนก / ชื่อ แบบเลือกทีละคน) — พิมพ์ค้นหาได้ และกดที่ช่องก็เห็นเป็นดรอปดาวน์รายการทั้งหมดได้เลย */
+.combo-wrap { position: relative; margin-bottom: 14px; }
+.combo-wrap.last { margin-bottom: 0; }
+.combo-wrap::after { content: '▾'; position: absolute; right: 13px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; font-size: 12px; }
+.combo-input {
+  width: 100%; padding: 11px 34px 11px 14px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 14px;
+  font-family: 'Sarabun', sans-serif; outline: none; transition: all .22s;
+}
+.combo-input:focus { border-color: rgba(59,124,244,0.6); background: #fff; box-shadow: 0 0 0 3px rgba(59,124,244,0.10); }
+.combo-input:disabled { opacity: 0.4; cursor: not-allowed; }
+.combo-dropdown {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+  background: #fff; border: 1.5px solid var(--border); border-radius: 10px;
+  max-height: 240px; overflow-y: auto; box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+  display: none;
+}
+.combo-dropdown.show { display: block; }
+.combo-dropdown::-webkit-scrollbar { width: 4px; }
+.combo-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.combo-item {
+  padding: 9px 12px; cursor: pointer; font-size: 13px; color: var(--text2);
+  border-bottom: 1px solid var(--border); transition: background .15s;
+}
+.combo-item:last-child { border-bottom: none; }
+.combo-item:hover, .combo-item.hl { background: rgba(59,124,244,0.06); color: var(--text); }
+.combo-item mark { background: rgba(59,124,244,0.18); color: var(--blue); border-radius: 2px; }
+.combo-empty { padding: 12px; font-size: 13px; color: var(--text3); }
+
 /* Name list */
 .name-list-wrap {
   background: var(--bg); border: 1.5px solid var(--border);
@@ -339,21 +369,25 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
       <button class="mode-btn" id="mode-multi"  onclick="setMode('multi')">👥 เลือกทีละหลายคน</button>
     </div>
     <span class="fld">แผนก</span>
-    <div class="sel-wrap">
-      <select id="f-dept" onchange="onDeptChange()">
-        <option value="">— กำลังโหลด... —</option>
-      </select>
+    <div class="combo-wrap" id="dept-combo">
+      <input type="text" id="f-dept-input" class="combo-input" placeholder="— กำลังโหลด... —" autocomplete="off" disabled
+             oninput="onDeptSearch()" onfocus="onDeptSearch()" onclick="onDeptSearch()" onblur="onComboBlur('dept')" onkeydown="onComboKeydown(event,'dept')">
+      <input type="hidden" id="f-dept" value="">
+      <div class="combo-dropdown" id="dept-dropdown"></div>
     </div>
     <div id="single-wrap">
       <span class="fld">ชื่อ - นามสกุล</span>
-      <div class="sel-wrap last">
-        <select id="f-name" disabled onchange="onFieldChange()">
-          <option value="">— เลือกแผนกก่อน —</option>
-        </select>
+      <div class="combo-wrap last" id="name-combo">
+        <input type="text" id="f-name-input" class="combo-input" placeholder="— เลือกแผนกก่อน —" autocomplete="off" disabled
+               oninput="onNameSearch()" onfocus="onNameSearch()" onclick="onNameSearch()" onblur="onComboBlur('name')" onkeydown="onComboKeydown(event,'name')">
+        <input type="hidden" id="f-name" value="">
+        <div class="combo-dropdown" id="name-dropdown"></div>
       </div>
     </div>
     <div id="multi-wrap" style="display:none">
       <span class="fld">เลือกรายชื่อ (เลือกได้หลายคน)</span>
+      <input type="text" id="multi-search" class="combo-input" placeholder="🔍 พิมพ์เพื่อค้นหาชื่อ..." autocomplete="off"
+             style="margin-bottom:8px" oninput="renderNameList()">
       <div class="name-list-wrap" id="name-list">
         <div class="name-list-empty">— เลือกแผนกก่อน —</div>
       </div>
@@ -422,7 +456,7 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 
 <script>
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
-let deptMap = {}, allLeaves = [], checkTimer = null, currentMode = 'single', selectedNames = [];
+let deptMap = {}, deptListArr = [], allLeaves = [], checkTimer = null, currentMode = 'single', selectedNames = [];
 const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑','ล่วงเวลาเฉพาะ รพ.':'🏥','นอกเวลาเฉพาะ รพ.':'🌇' };
 function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
@@ -439,13 +473,19 @@ const TIME_TYPE_SLOTS = {
 };
 function thDate(s) { if (!s) return '-'; const [y,m,d] = s.split('-'); if (!y||!m||!d) return s; return `${+d} ${TH_M[+m]} ${+y+543}`; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function highlightMatch(text, q) {
+  if (!q) return esc(text);
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return esc(text);
+  return esc(text.slice(0,idx)) + '<mark>' + esc(text.slice(idx,idx+q.length)) + '</mark>' + esc(text.slice(idx+q.length));
+}
 (function(){ const t = new Date().toISOString().split('T')[0]; document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();
 window.onload = async function(){ await initLoad(); };
 // promise ของข้อมูลการลา — ใช้รอตอนจะเช็ควันซ้ำ/บันทึก โดยไม่บล็อกการโหลดแผนก
 let leavesLoadPromise = null;
 async function initLoad() {
   if (!API) { showToast('❌ ยังไม่ตั้งค่า API URL', 'error'); if(window.Loader)Loader.hide(); return; }
-  const sel = document.getElementById('f-dept');
+  const input = document.getElementById('f-dept-input');
 
   // ยิงคำขอ getDepts + getLeaves พร้อมกัน แต่ "ไม่รอ" ให้ทั้งคู่เสร็จก่อนแสดงแผนก
   const deptPromise  = window.DataCache ? DataCache.getDepts()  : fetch(API+'?action=getDepts').then(r=>r.json());
@@ -454,16 +494,14 @@ async function initLoad() {
     .then(data => { allLeaves = data || []; return allLeaves; })
     .catch(e => { allLeaves = []; showToast('❌ โหลดประวัติการลาไม่ได้: '+e.message,'error'); return allLeaves; });
 
-  // แสดง dropdown แผนกทันทีที่โหลดเสร็จ ไม่ต้องรอข้อมูลการลาทั้งหมด (สาเหตุที่ทำให้หน้าช้า)
+  // แสดงช่องค้นหาแผนกทันทีที่โหลดเสร็จ ไม่ต้องรอข้อมูลการลาทั้งหมด (สาเหตุที่ทำให้หน้าช้า)
   try {
     deptMap = await deptPromise;
-    if (Object.keys(deptMap).length === 0) { sel.innerHTML = '<option value="">— โหลดไม่สำเร็จ —</option>'; }
-    else {
-      sel.innerHTML = '<option value="">— เลือกแผนก —</option>';
-      Object.keys(deptMap).forEach(d => { sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`; });
-    }
+    deptListArr = Object.keys(deptMap);
+    if (deptListArr.length === 0) { input.placeholder = '— โหลดไม่สำเร็จ —'; }
+    else { input.placeholder = 'พิมพ์เพื่อค้นหาแผนก...'; input.disabled = false; }
   } catch(e) {
-    sel.innerHTML = '<option value="">— โหลดไม่สำเร็จ —</option>';
+    input.placeholder = '— โหลดไม่สำเร็จ —';
     showToast('❌ โหลดแผนกไม่ได้: '+e.message,'error');
   }
   if (window.Loader) Loader.hide(); // ปิดหน้าจอโหลดทันทีที่แผนกพร้อม ข้อมูลการลาโหลดต่อเบื้องหลัง
@@ -474,33 +512,121 @@ function setMode(mode) {
   document.getElementById('mode-multi').className  = 'mode-btn'+(mode==='multi'?' active':'');
   document.getElementById('single-wrap').style.display = mode==='single'?'':'none';
   document.getElementById('multi-wrap').style.display  = mode==='multi'?'':'none';
-  selectedNames = []; document.getElementById('f-name').value = ''; renderSelectedTags();
+  selectedNames = [];
+  document.getElementById('f-name').value=''; document.getElementById('f-name-input').value='';
+  renderSelectedTags();
   const dept = document.getElementById('f-dept').value;
-  if (dept && mode==='multi') buildNameList(deptMap[dept]||[]);
+  if (dept && mode==='multi') renderNameList();
   onFieldChange();
+}
+/* ── Combobox แผนก/ชื่อ (พิมพ์ค้นหาแบบ autocomplete) ── */
+let comboItems = { dept: [], name: [] };
+let comboHL = { dept: -1, name: -1 };
+function renderCombo(kind, items, query) {
+  const dd = document.getElementById(kind+'-dropdown');
+  const q = (query||'').trim();
+  const filtered = q ? items.filter(x=>x.toLowerCase().includes(q.toLowerCase())) : items;
+  comboItems[kind] = filtered;
+  comboHL[kind] = filtered.length ? 0 : -1;
+  if (!filtered.length) {
+    dd.innerHTML = `<div class="combo-empty">${items.length ? 'ไม่พบรายการที่ตรงกัน' : 'ไม่มีข้อมูล'}</div>`;
+  } else {
+    dd.innerHTML = filtered.map((x,i)=>`<div class="combo-item${i===0?' hl':''}" data-i="${i}">${highlightMatch(x,q)}</div>`).join('');
+    [...dd.querySelectorAll('.combo-item')].forEach(el=>{
+      // ใช้ mousedown+preventDefault กันไม่ให้ blur ของ input ปิด dropdown ก่อนที่ click จะทำงาน
+      el.onmousedown = (e) => { e.preventDefault(); selectCombo(kind, filtered[+el.dataset.i]); };
+    });
+  }
+  dd.classList.add('show');
+}
+function closeCombo(kind) { document.getElementById(kind+'-dropdown').classList.remove('show'); }
+function updateComboHL(kind) {
+  const dd = document.getElementById(kind+'-dropdown');
+  [...dd.querySelectorAll('.combo-item')].forEach((el,i)=>{
+    el.classList.toggle('hl', i===comboHL[kind]);
+    if (i===comboHL[kind]) el.scrollIntoView({block:'nearest'});
+  });
+}
+function selectCombo(kind, val) { if (kind==='dept') selectDept(val); else selectName(val); }
+function selectDept(name) {
+  document.getElementById('f-dept').value = name;
+  document.getElementById('f-dept-input').value = name;
+  closeCombo('dept');
+  onDeptChange();
+}
+function selectName(name) {
+  document.getElementById('f-name').value = name;
+  document.getElementById('f-name-input').value = name;
+  closeCombo('name');
+  onFieldChange();
+}
+function onDeptSearch() {
+  const input = document.getElementById('f-dept-input');
+  if (input.disabled) return;
+  const hidden = document.getElementById('f-dept').value;
+  const q = (input.value === hidden) ? '' : input.value; // ยังไม่ได้พิมพ์แก้ไข -> โชว์รายการทั้งหมดแบบดรอปดาวน์
+  renderCombo('dept', deptListArr, q);
+}
+function onNameSearch() {
+  const input = document.getElementById('f-name-input');
+  if (input.disabled) return;
+  const dept = document.getElementById('f-dept').value;
+  const hidden = document.getElementById('f-name').value;
+  const q = (input.value === hidden) ? '' : input.value;
+  renderCombo('name', deptMap[dept]||[], q);
+}
+function onComboBlur(kind) {
+  setTimeout(()=>{ // หน่วงให้ mousedown บน dropdown item ทำงานก่อน blur จะปิดมันซะก่อน
+    closeCombo(kind);
+    const inputEl = document.getElementById('f-'+kind+'-input'), hiddenEl = document.getElementById('f-'+kind);
+    if (inputEl.value === hiddenEl.value) return; // ตรงกับค่าที่เลือกไว้อยู่แล้ว ไม่ต้องทำอะไร
+    const list = kind==='dept' ? deptListArr : (deptMap[document.getElementById('f-dept').value]||[]);
+    const exact = list.find(x=>x===inputEl.value);
+    if (exact) { selectCombo(kind, exact); }
+    else { inputEl.value=''; hiddenEl.value=''; if (kind==='dept') onDeptChange(); else onFieldChange(); }
+  }, 150);
+}
+function onComboKeydown(e, kind) {
+  const dd = document.getElementById(kind+'-dropdown');
+  if (!dd.classList.contains('show')) return;
+  const items = comboItems[kind];
+  if (!items.length) return;
+  if (e.key==='ArrowDown') { e.preventDefault(); comboHL[kind]=Math.min(comboHL[kind]+1, items.length-1); updateComboHL(kind); }
+  else if (e.key==='ArrowUp') { e.preventDefault(); comboHL[kind]=Math.max(comboHL[kind]-1, 0); updateComboHL(kind); }
+  else if (e.key==='Enter') { e.preventDefault(); if (comboHL[kind]>=0) selectCombo(kind, items[comboHL[kind]]); }
+  else if (e.key==='Escape') { closeCombo(kind); }
 }
 function onDeptChange() {
   const dept = document.getElementById('f-dept').value; selectedNames = [];
   if (currentMode==='single') {
-    const ns = document.getElementById('f-name');
-    if (!dept) { ns.disabled=true; ns.innerHTML='<option value="">— เลือกแผนกก่อน —</option>'; }
-    else { ns.disabled=false; const names=deptMap[dept]||[]; let html='<option value="">— เลือกชื่อ —</option>'; names.forEach(n=>{html+=`<option value="${esc(n)}">${esc(n)}</option>`;}); ns.innerHTML=html; }
+    const inputEl = document.getElementById('f-name-input');
+    document.getElementById('f-name').value=''; inputEl.value='';
+    if (!dept) { inputEl.disabled=true; inputEl.placeholder='— เลือกแผนกก่อน —'; }
+    else { inputEl.disabled=false; inputEl.placeholder='พิมพ์เพื่อค้นหาชื่อ...'; }
   } else {
+    document.getElementById('multi-search').value='';
     if (!dept) document.getElementById('name-list').innerHTML='<div class="name-list-empty">— เลือกแผนกก่อน —</div>';
-    else buildNameList(deptMap[dept]||[]);
+    else renderNameList();
     renderSelectedTags();
   }
   onFieldChange();
 }
-function buildNameList(names) {
+function renderNameList() {
+  const dept = document.getElementById('f-dept').value;
+  const names = deptMap[dept]||[];
+  const q = (document.getElementById('multi-search').value||'').trim();
+  const filtered = q ? names.filter(n=>n.toLowerCase().includes(q.toLowerCase())) : names;
+  buildNameList(filtered, q);
+}
+function buildNameList(names, q) {
   const wrap = document.getElementById('name-list');
-  if (!names.length) { wrap.innerHTML='<div class="name-list-empty">— ไม่มีรายชื่อในแผนกนี้ —</div>'; return; }
-  wrap.innerHTML = names.map(n=>`<div class="name-item${selectedNames.includes(n)?' selected':''}" onclick="toggleName('${esc(n)}')"><div class="chk">${selectedNames.includes(n)?'✓':''}</div><span>${esc(n)}</span></div>`).join('');
+  if (!names.length) { wrap.innerHTML=`<div class="name-list-empty">— ${q?'ไม่พบรายชื่อที่ตรงกัน':'ไม่มีรายชื่อในแผนกนี้'} —</div>`; return; }
+  wrap.innerHTML = names.map(n=>`<div class="name-item${selectedNames.includes(n)?' selected':''}" onclick="toggleName('${esc(n)}')"><div class="chk">${selectedNames.includes(n)?'✓':''}</div><span>${q?highlightMatch(n,q):esc(n)}</span></div>`).join('');
 }
 function toggleName(name) {
   const idx = selectedNames.indexOf(name);
   if (idx===-1) selectedNames.push(name); else selectedNames.splice(idx,1);
-  const dept = document.getElementById('f-dept').value; buildNameList(deptMap[dept]||[]); renderSelectedTags(); onFieldChange();
+  renderNameList(); renderSelectedTags(); onFieldChange();
 }
 function renderSelectedTags() {
   const sec=document.getElementById('tags-section'), wrap=document.getElementById('selected-tags');
@@ -544,7 +670,7 @@ function onFieldChange() {
   const from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, typeReady=isTypeReady();
   if (currentMode==='single') {
     const name=document.getElementById('f-name').value;
-    if (name&&from&&to&&typeReady) checkTimer=setTimeout(async()=>{ if(leavesLoadPromise) await leavesLoadPromise; checkDuplicate(name,from,to); },300);
+    if (name&&from&&to&&typeReady) { document.getElementById('btn-save').disabled=true; setCheckStatus('checking','⏳ กำลังตรวจสอบวันที่ว่าง...'); checkTimer=setTimeout(async()=>{ if(leavesLoadPromise) await leavesLoadPromise; checkDuplicate(name,from,to); },300); }
     else setCheckStatus('','');
   } else {
     const ready=selectedNames.length>0&&from&&to&&typeReady;
@@ -630,12 +756,22 @@ async function doSaveMulti() {
   showToast(`✅ บันทึกสำเร็จ ${okCount}/${names.length} คน`,'success');
   btn.disabled=false; btn.innerHTML='💾 บันทึกข้อมูล';
   selectedNames=[]; renderSelectedTags();
-  const deptVal=document.getElementById('f-dept').value; buildNameList(deptMap[deptVal]||[]); onFieldChange();
+  renderNameList(); onFieldChange();
 }
 function resetForm(keepDept) {
   selectedNames=[];
-  if (!keepDept) { document.getElementById('f-dept').value=''; document.getElementById('f-name').innerHTML='<option value="">— เลือกแผนกก่อน —</option>'; document.getElementById('f-name').disabled=true; document.getElementById('name-list').innerHTML='<div class="name-list-empty">— เลือกแผนกก่อน —</div>'; }
-  else { document.getElementById('f-name').value=''; const dept=document.getElementById('f-dept').value; if (dept&&currentMode==='multi') buildNameList(deptMap[dept]||[]); }
+  if (!keepDept) {
+    document.getElementById('f-dept').value=''; document.getElementById('f-dept-input').value='';
+    document.getElementById('f-name').value=''; document.getElementById('f-name-input').value='';
+    document.getElementById('f-name-input').disabled=true; document.getElementById('f-name-input').placeholder='— เลือกแผนกก่อน —';
+    document.getElementById('name-list').innerHTML='<div class="name-list-empty">— เลือกแผนกก่อน —</div>';
+    document.getElementById('multi-search').value='';
+  }
+  else {
+    document.getElementById('f-name').value=''; document.getElementById('f-name-input').value='';
+    document.getElementById('multi-search').value='';
+    const dept=document.getElementById('f-dept').value; if (dept&&currentMode==='multi') renderNameList();
+  }
   renderSelectedTags();
   document.getElementById('f-type').value='';
   TYPES.forEach(x=>document.getElementById('tb-'+slug(x)).className=`type-btn t-${slug(x)}`);
