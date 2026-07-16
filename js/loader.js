@@ -5,6 +5,9 @@
 (function () {
   'use strict';
 
+  // ปิด/เปิดเอฟเฟกต์ loader (กราฟวิ่งแบบสายฟ้า) ตรงนี้ที่เดียว — false = ปิด (ไม่ลบโค้ดทิ้ง), true = เปิดใช้กลับ
+  var ENABLED = false;
+
   var canvas, ctx, pbar, raf;
   var nodes, edges, dijkV, dijkP, aV, aP, si, ei;
   var state = {};
@@ -239,6 +242,7 @@
   /* ── Public API ── */
   window.Loader = {
     hide: function () {
+      if (!ENABLED) return;
       /* บอก animation ว่าข้อมูลพร้อมแล้ว → วิ่งจบได้เลย */
       if (state) state._dataReady = true;
 
@@ -271,6 +275,7 @@
       }, 50);
     },
     show: function () {
+      if (!ENABLED) return;
       hidden = false;
       canvas.style.display = 'block';
       canvas.style.opacity = '1';
@@ -282,6 +287,7 @@
 
   /* ── Init on DOM ready ── */
   function init() {
+    if (!ENABLED) return; // ปิดเอฟเฟกต์ไว้ - ไม่ต้องสร้าง canvas/แถบโหลดเลย
     /* Canvas — fullscreen, transparent, on top of everything */
     canvas = document.createElement('canvas');
     canvas.id = 'algo-loader-canvas';
@@ -334,6 +340,7 @@
     var href = a.getAttribute('href');
     if (!href || href.charAt(0) === '#' || href.indexOf('javascript') === 0 || href.indexOf('http') === 0 ||
         href.indexOf('blob:') === 0 || href.indexOf('data:') === 0) return;
+    if (!ENABLED) return; // ปิดเอฟเฟกต์ไว้ - ปล่อยให้ลิงก์นำทางไปตามปกติ ไม่ต้องหน่วงเวลารอ animation
     e.preventDefault();
     window.Loader.show();
     setTimeout(function () { window.location.href = href; }, 950);
