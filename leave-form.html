@@ -9,6 +9,7 @@
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
 <script src="js/loader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
 :root {
@@ -310,6 +311,46 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 .spinner { width: 13px; height: 13px; border: 2px solid rgba(59,124,244,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Import from Excel ── */
+.import-note {
+  font-size: 0.8em; color: var(--text2); line-height: 1.7;
+  background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.import-drop {
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 10px; padding: 22px 14px; border-radius: 12px;
+  border: 1.75px dashed var(--border-hover); background: var(--bg);
+  color: var(--text2); font-size: 0.85em; font-weight: 600; text-align: center;
+  cursor: pointer; transition: all .2s;
+}
+.import-drop:hover { border-color: var(--blue); background: var(--blue-light); color: var(--blue); }
+.import-drop.has-file { border-style: solid; border-color: rgba(16,185,129,0.4); background: var(--green-light); color: #059669; }
+#import-summary { margin-top: 12px; font-size: 0.83em; font-weight: 700; color: var(--text2); display: none; }
+#import-summary.show { display: block; }
+#import-table-wrap { margin-top: 10px; max-height: 360px; overflow-y: auto; border-radius: 12px; border: 1.5px solid var(--border); display: none; }
+#import-table-wrap.show { display: block; }
+.imp-table { width: 100%; border-collapse: collapse; font-size: 0.78em; }
+.imp-table th {
+  position: sticky; top: 0; background: var(--bg2); color: var(--text2);
+  text-align: left; padding: 8px 10px; font-size: 0.9em; font-weight: 700; border-bottom: 1.5px solid var(--border);
+}
+.imp-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+.imp-table tr:last-child td { border-bottom: none; }
+.imp-row-err td { background: rgba(239,68,68,0.05); }
+.imp-row-ok td { background: rgba(16,185,129,0.04); }
+.imp-row-saved td { background: rgba(59,124,244,0.06); }
+.imp-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.92em; font-weight: 700; white-space: nowrap; }
+.imp-badge.ok  { background: rgba(16,185,129,0.12); color: #059669; }
+.imp-badge.err { background: rgba(239,68,68,0.12); color: #dc2626; }
+.imp-badge.saved { background: rgba(59,124,244,0.14); color: var(--blue); }
+.imp-badge.saving { background: rgba(245,158,11,0.14); color: #b45309; }
+#import-progress {
+  display: none; background: rgba(59,124,244,0.06);
+  border: 1.5px solid rgba(59,124,244,0.2); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 10px; font-size: 0.85em; color: var(--blue);
+}
+#import-progress.show { display: block; }
+
 /* ═══════════════════════════════
    DARK MODE  (toggle via #dm-btn)
 ═══════════════════════════════ */
@@ -365,9 +406,11 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
     <div class="card-lbl"><span class="clbl-dot">👥</span>ข้อมูลกำลังพล</div>
     <span class="fld">รูปแบบการเลือก</span>
     <div class="mode-toggle" style="margin-bottom:16px">
-      <button class="mode-btn active" id="mode-single" onclick="setMode('single')">👤 เลือกทีละคน</button>
-      <button class="mode-btn" id="mode-multi"  onclick="setMode('multi')">👥 เลือกทีละหลายคน</button>
+      <button class="mode-btn active" id="mode-single" onclick="setMode('single')">👤 ทีละคน</button>
+      <button class="mode-btn" id="mode-multi"  onclick="setMode('multi')">👥 หลายคน</button>
+      <button class="mode-btn" id="mode-import" onclick="setMode('import')">📥 นำเข้าไฟล์</button>
     </div>
+    <div id="manual-select-wrap">
     <span class="fld">แผนก</span>
     <div class="combo-wrap" id="dept-combo">
       <input type="text" id="f-dept-input" class="combo-input" placeholder="— กำลังโหลด... —" autocomplete="off" disabled
@@ -396,8 +439,23 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
         <div class="selected-tags" id="selected-tags"></div>
       </div>
     </div>
+    </div>
+    <div id="import-wrap" style="display:none">
+      <div class="import-note">
+        ไฟล์ต้องมีคอลัมน์: <b>แผนก, ชื่อ, ประเภท, วันที่ไป, วันที่กลับ</b> (แถวแรกเป็นหัวตาราง)<br>
+        รองรับเฉพาะประเภทที่ไม่ต้องระบุช่วงเวลา (ลา / ศึกษา / ราชการ / ล่วงเวลา / เวร / อื่นๆ)
+      </div>
+      <button type="button" class="btn-ghost" style="margin-top:10px" onclick="downloadImportTemplate()">⬇️ ดาวน์โหลดไฟล์ตัวอย่างเทมเพลต</button>
+      <label class="import-drop" id="import-drop" for="import-file">
+        <span id="import-drop-label">📄 แตะเพื่อเลือกไฟล์ Excel (.xlsx)</span>
+      </label>
+      <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none" onchange="onImportFile(event)">
+      <div id="import-summary"></div>
+      <div id="import-table-wrap"></div>
+    </div>
   </div>
 
+  <div id="type-date-wrap">
   <div class="card">
     <div class="card-lbl"><span class="clbl-dot">🗂️</span>ประเภทการจำหน่าย</div>
     <div class="type-grid">
@@ -433,12 +491,15 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
       </div>
     </div>
   </div>
+  </div>
 
   <div id="check-status"></div>
   <div id="preview"></div>
   <div id="multi-progress"></div>
+  <div id="import-progress"></div>
 
   <button class="btn-primary" id="btn-save" onclick="doSave()" disabled>💾 บันทึกข้อมูล</button>
+  <button class="btn-primary" id="btn-save-import" onclick="doSaveImport()" style="display:none" disabled>💾 บันทึกรายการที่ผ่านการตรวจสอบ</button>
   <button class="btn-ghost" onclick="resetForm()">🔄 ล้างข้อมูล</button>
 
 </div>
@@ -456,7 +517,10 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 
 <script>
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
+const IMPORT_TEMPLATE_B64 = "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"; // เทมเพลต Excel ต้นฉบับ (มี dropdown ตรวจประเภท + ตัวอย่างไฮไลต์ + คำอธิบาย)
+
 let deptMap = {}, deptListArr = [], allLeaves = [], checkTimer = null, currentMode = 'single', selectedNames = [];
+let importRows = [];
 const TH_M = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const TYPE_ICON = { 'ลา':'🏖️','ศึกษา':'🎓','ราชการ':'🏛️','ล่วงเวลา':'⏰','เวร':'🌙','อื่นๆ':'📌','รับเสด็จ':'👑','ล่วงเวลาเฉพาะ รพ.':'🏥','นอกเวลาเฉพาะ รพ.':'🌇' };
 function baseType(t){ if(!t) return t; const i=String(t).indexOf('|'); return i>-1?t.slice(0,i):t; }
@@ -471,6 +535,7 @@ const TIME_TYPE_SLOTS = {
   'ล่วงเวลาเฉพาะ รพ.': ['08.00 - 16.00','16.00 - 24.00','00.00 - 08.00'],
   'นอกเวลาเฉพาะ รพ.': ['16.00 - 20.00']
 };
+const VALID_IMPORT_TYPES = TYPES.filter(t => !TIME_TYPE_SLOTS[t]);
 function thDate(s) { if (!s) return '-'; const [y,m,d] = s.split('-'); if (!y||!m||!d) return s; return `${+d} ${TH_M[+m]} ${+y+543}`; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function highlightMatch(text, q) {
@@ -510,14 +575,28 @@ function setMode(mode) {
   currentMode = mode;
   document.getElementById('mode-single').className = 'mode-btn'+(mode==='single'?' active':'');
   document.getElementById('mode-multi').className  = 'mode-btn'+(mode==='multi'?' active':'');
+  document.getElementById('mode-import').className = 'mode-btn'+(mode==='import'?' active':'');
+  document.getElementById('manual-select-wrap').style.display = mode==='import'?'none':'';
   document.getElementById('single-wrap').style.display = mode==='single'?'':'none';
   document.getElementById('multi-wrap').style.display  = mode==='multi'?'':'none';
+  document.getElementById('import-wrap').style.display = mode==='import'?'':'none';
+  document.getElementById('type-date-wrap').style.display = mode==='import'?'none':'';
+  document.getElementById('btn-save').style.display = mode==='import'?'none':'';
+  document.getElementById('btn-save-import').style.display = mode==='import'?'':'none';
+  document.getElementById('check-status').className=''; document.getElementById('check-status').innerHTML='';
+  document.getElementById('preview').className='';
+  document.getElementById('multi-progress').className='';
+  if (mode!=='import') {
+    document.getElementById('import-summary').className='';
+    document.getElementById('import-table-wrap').className='';
+    document.getElementById('import-progress').className='';
+  }
   selectedNames = [];
   document.getElementById('f-name').value=''; document.getElementById('f-name-input').value='';
   renderSelectedTags();
   const dept = document.getElementById('f-dept').value;
   if (dept && mode==='multi') renderNameList();
-  onFieldChange();
+  if (mode!=='import') onFieldChange();
 }
 /* ── Combobox แผนก/ชื่อ (พิมพ์ค้นหาแบบ autocomplete) ── */
 let comboItems = { dept: [], name: [] };
@@ -774,6 +853,149 @@ async function doSaveMulti() {
   selectedNames=[]; renderSelectedTags();
   renderNameList(); onFieldChange();
 }
+/* ══════════ นำเข้าข้อมูลจาก Excel ══════════ */
+function downloadImportTemplate() {
+  try {
+    const bin = atob(IMPORT_TEMPLATE_B64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'แบบฟอร์มนำเข้าข้อมูลจำหน่าย.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  } catch(err) { showToast('❌ ดาวน์โหลดเทมเพลตไม่สำเร็จ: '+err.message, 'error'); }
+}
+function excelDateToYMD(v) {
+  if (v===undefined||v===null||v==='') return '';
+  if (v instanceof Date && !isNaN(v)) {
+    const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof v === 'number') {
+    const d = XLSX.SSF.parse_date_code(v);
+    return d ? `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}` : '';
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  if (m) return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+  if (m) return `${m[3]}-${String(+m[2]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`;
+  return '';
+}
+function onImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('import-drop-label').textContent = '📄 ' + file.name;
+  document.getElementById('import-drop').classList.add('has-file');
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      await parseAndValidateRows(rows);
+    } catch(err) { showToast('❌ อ่านไฟล์ไม่สำเร็จ: '+err.message, 'error'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+async function parseAndValidateRows(rows) {
+  let headerIdx = -1;
+  for (let i=0;i<rows.length;i++) { if (rows[i] && rows[i].some(c=>String(c).trim()==='แผนก')) { headerIdx=i; break; } }
+  if (headerIdx===-1) { showToast('❌ ไม่พบหัวตาราง (แผนก, ชื่อ, ประเภท, วันที่ไป, วันที่กลับ)', 'error'); return; }
+  const header = rows[headerIdx].map(x=>String(x).trim());
+  const idx = { dept:header.indexOf('แผนก'), name:header.indexOf('ชื่อ'), type:header.indexOf('ประเภท'), from:header.indexOf('วันที่ไป'), to:header.indexOf('วันที่กลับ') };
+  if (idx.dept===-1||idx.name===-1||idx.type===-1||idx.from===-1||idx.to===-1) { showToast('❌ คอลัมน์ไม่ครบ ต้องมี: แผนก, ชื่อ, ประเภท, วันที่ไป, วันที่กลับ', 'error'); return; }
+  if (leavesLoadPromise) await leavesLoadPromise;
+  const parsed = [];
+  for (let i=headerIdx+1;i<rows.length;i++) {
+    const r = rows[i]; if (!r) continue;
+    const dept=String(r[idx.dept]||'').trim(), name=String(r[idx.name]||'').trim(), type=String(r[idx.type]||'').trim();
+    const from=excelDateToYMD(r[idx.from]), to=excelDateToYMD(r[idx.to]);
+    if (!dept && !name && !type && !from && !to) continue;
+    parsed.push({rownum:i+1, dept, name, type, from, to, status:'', msg:''});
+  }
+  if (!parsed.length) { showToast('⚠️ ไม่พบข้อมูลในไฟล์', 'error'); return; }
+  importRows = parsed;
+  validateImportRows();
+  renderImportTable();
+}
+function validateImportRows() {
+  importRows.forEach(row => {
+    row.status=''; row.msg='';
+    if (!row.dept || !deptMap.hasOwnProperty(row.dept)) { row.status='err'; row.msg='ไม่พบแผนกนี้ในระบบ'; return; }
+    const names = deptMap[row.dept]||[];
+    if (!row.name || !names.includes(row.name)) { row.status='err'; row.msg='ไม่พบชื่อนี้ในแผนกที่ระบุ'; return; }
+    if (!row.type || !VALID_IMPORT_TYPES.includes(row.type)) { row.status='err'; row.msg='ประเภทไม่ถูกต้อง/ไม่รองรับผ่านไฟล์'; return; }
+    if (!row.from || !row.to) { row.status='err'; row.msg='รูปแบบวันที่ไม่ถูกต้อง'; return; }
+    if (row.from > row.to) { row.status='err'; row.msg='วันที่ไปมากกว่าวันที่กลับ'; return; }
+    if (findConflicts(row.name, row.from, row.to, row.type).length) { row.status='err'; row.msg='วันที่ซ้ำกับข้อมูลเดิมในระบบ'; return; }
+    row.status='ok'; row.msg='พร้อมบันทึก';
+  });
+  // ตรวจซ้ำกันเองภายในไฟล์ (คนเดียวกัน ช่วงวันทับกัน)
+  importRows.forEach((row, i) => {
+    if (row.status!=='ok') return;
+    for (let j=0;j<i;j++) {
+      const o = importRows[j];
+      if (o.status!=='ok') continue;
+      if (o.name===row.name && row.from<=o.to && row.to>=o.from) { row.status='err'; row.msg='วันที่ซ้ำกับแถวอื่นในไฟล์เดียวกัน (แถว '+o.rownum+')'; break; }
+    }
+  });
+}
+function renderImportTable() {
+  const okCount = importRows.filter(r=>r.status==='ok').length, errCount = importRows.filter(r=>r.status==='err').length;
+  const summary = document.getElementById('import-summary'); summary.className='show';
+  summary.innerHTML = `พบทั้งหมด ${importRows.length} แถว — <span style="color:#059669">✅ พร้อมบันทึก ${okCount}</span> · <span style="color:#dc2626">❌ ผิดพลาด ${errCount}</span>`;
+  const wrap = document.getElementById('import-table-wrap'); wrap.className='show';
+  wrap.innerHTML = `<table class="imp-table"><thead><tr><th>#</th><th>แผนก</th><th>ชื่อ</th><th>ประเภท</th><th>วันที่</th><th>สถานะ</th></tr></thead><tbody>` +
+    importRows.map((r,i) => {
+      const dlbl = r.from && r.to ? (r.from===r.to?thDate(r.from):`${thDate(r.from)} → ${thDate(r.to)}`) : '-';
+      const cls = r.status==='ok' ? 'imp-row-ok' : (r.status==='err' ? 'imp-row-err' : '');
+      const badge = r.status==='ok' ? `<span class="imp-badge ok">✅ พร้อมบันทึก</span>` : `<span class="imp-badge err">❌ ${esc(r.msg)}</span>`;
+      return `<tr class="${cls}" id="imp-row-${i}"><td>${r.rownum}</td><td>${esc(r.dept)}</td><td>${esc(r.name)}</td><td>${esc(r.type)}</td><td>${dlbl}</td><td>${badge}</td></tr>`;
+    }).join('') + `</tbody></table>`;
+  const btn = document.getElementById('btn-save-import');
+  btn.disabled = okCount===0;
+  btn.innerHTML = okCount>0 ? `💾 บันทึก ${okCount} รายการที่พร้อม` : `💾 บันทึกรายการที่ผ่านการตรวจสอบ`;
+}
+async function doSaveImport() {
+  const toSave = importRows.map((r,i)=>({...r, idx:i})).filter(r=>r.status==='ok');
+  if (!toSave.length) return;
+  const btn = document.getElementById('btn-save-import'); btn.disabled=true;
+  const prog = document.getElementById('import-progress'); prog.className='show'; prog.innerHTML=`<b>กำลังบันทึก ${toSave.length} รายการ...</b><br>`;
+  let okCount=0;
+  for (let n=0;n<toSave.length;n++) {
+    const row = toSave[n];
+    btn.innerHTML = `⏳ กำลังบันทึก ${n+1}/${toSave.length}...`;
+    const rowEl = document.getElementById('imp-row-'+row.idx);
+    try {
+      const r = await fetch(API, {method:'POST', body:JSON.stringify({action:'saveLeave', dept:row.dept, name:row.name, leaveType:row.type, dateFrom:row.from, dateTo:row.to})});
+      const data = await r.json();
+      if (data.success) {
+        allLeaves.push({name:row.name, dept:row.dept, leaveType:row.type, dateFrom:row.from, dateTo:row.to});
+        importRows[row.idx].status='saved';
+        if (rowEl) { rowEl.className='imp-row-saved'; rowEl.lastElementChild.innerHTML='<span class="imp-badge saved">💾 บันทึกแล้ว</span>'; }
+        prog.innerHTML += `<div class="prog-item ok">✅ ${esc(row.name)}</div>`;
+        okCount++;
+      } else {
+        const msg = data.message || (data.duplicate ? 'ซ้ำ' : 'ไม่สำเร็จ');
+        if (rowEl) { rowEl.className='imp-row-err'; rowEl.lastElementChild.innerHTML=`<span class="imp-badge err">❌ ${esc(msg)}</span>`; }
+        prog.innerHTML += `<div class="prog-item err">❌ ${esc(row.name)} — ${esc(msg)}</div>`;
+      }
+    } catch(err) {
+      if (rowEl) { rowEl.className='imp-row-err'; rowEl.lastElementChild.innerHTML=`<span class="imp-badge err">❌ ${esc(err.message)}</span>`; }
+      prog.innerHTML += `<div class="prog-item err">❌ ${esc(row.name)} — ${esc(err.message)}</div>`;
+    }
+  }
+  if (window.DataCache) DataCache.invalidate();
+  prog.innerHTML += `<br><b>เสร็จสิ้น: บันทึกสำเร็จ ${okCount}/${toSave.length} รายการ</b>`;
+  showToast(`✅ บันทึกสำเร็จ ${okCount}/${toSave.length} รายการ`, okCount===toSave.length?'success':'error');
+  btn.innerHTML = '💾 บันทึกรายการที่ผ่านการตรวจสอบ';
+  btn.disabled = true;
+}
+
 function resetForm(keepDept) {
   selectedNames=[];
   if (!keepDept) {
@@ -795,6 +1017,14 @@ function resetForm(keepDept) {
   const t=new Date().toISOString().split('T')[0]; document.getElementById('f-from').value=t; document.getElementById('f-to').value=t;
   document.getElementById('preview').className=''; document.getElementById('check-status').className=''; document.getElementById('check-status').innerHTML='';
   document.getElementById('multi-progress').className=''; document.getElementById('btn-save').disabled=true;
+  importRows = [];
+  document.getElementById('import-summary').className=''; document.getElementById('import-summary').innerHTML='';
+  document.getElementById('import-table-wrap').className=''; document.getElementById('import-table-wrap').innerHTML='';
+  document.getElementById('import-progress').className=''; document.getElementById('import-progress').innerHTML='';
+  document.getElementById('import-file').value='';
+  document.getElementById('import-drop-label').textContent='📄 แตะเพื่อเลือกไฟล์ Excel (.xlsx)';
+  document.getElementById('import-drop').classList.remove('has-file');
+  document.getElementById('btn-save-import').disabled=true;
 }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
 function showToast(msg,type) { const t=document.getElementById('toast'); t.innerText=msg; t.className='show '+(type||''); if(type==='success'){if(window.playSaveSuccess)playSaveSuccess();} else if(type==='error'){if(window.playSaveFail)playSaveFail();} setTimeout(()=>t.className='',3500); }
