@@ -210,6 +210,54 @@ html.dark {
   margin-top:24px; text-align:center; font-size:0.72em;
   color:var(--text3); position:relative; z-index:1;
 }
+
+/* LINE Login */
+.btn-line {
+  width:100%; padding:14px;
+  background:#06C755; color:#fff; border:none; border-radius:14px;
+  font-family:'Sarabun',sans-serif; font-size:1em; font-weight:700;
+  cursor:pointer; letter-spacing:.02em;
+  box-shadow: 0 4px 16px rgba(6,199,85,0.35);
+  transition: all .2s ease;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  margin-bottom:18px;
+}
+.btn-line:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(6,199,85,0.45); }
+.btn-line:active:not(:disabled) { transform: scale(.97); }
+.btn-line:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+.btn-line svg { width:22px; height:22px; flex-shrink:0; }
+
+.divider { display:flex; align-items:center; gap:12px; margin-bottom:18px; color:var(--text3); font-size:0.78em; }
+.divider::before, .divider::after { content:''; flex:1; height:1px; background:var(--border); }
+
+.step-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--blue-light); color:var(--blue); border:1px solid rgba(59,124,244,0.2);
+  border-radius:20px; padding:4px 12px; font-size:0.72em; font-weight:800; letter-spacing:.03em;
+  margin-bottom:10px;
+}
+
+.line-profile {
+  display:flex; align-items:center; gap:12px;
+  background:var(--bg); border:1.5px solid var(--border); border-radius:14px;
+  padding:12px 14px; margin-bottom:18px;
+}
+.line-profile img { width:40px; height:40px; border-radius:50%; flex-shrink:0; background:var(--border); }
+.line-profile .lp-text { flex:1; font-size:0.85em; color:var(--text2); }
+.line-profile .lp-text b { color:var(--text); font-size:1.05em; }
+.link-btn {
+  background:none; border:none; color:var(--blue); font-size:0.78em; font-weight:700;
+  font-family:'Sarabun',sans-serif; cursor:pointer; text-decoration:underline; padding:0;
+  white-space:nowrap;
+}
+
+.pending-msg {
+  background: rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);
+  border-radius:12px; padding:14px 16px;
+  font-size:0.82em; color:#b45309; font-weight:600;
+  text-align:center; line-height:1.6; margin-bottom:16px; display:none;
+}
+.pending-msg.show { display:block; animation: fadeInUp .3s ease both; }
 </style>
 </head>
 <body>
@@ -226,24 +274,48 @@ html.dark {
 
   <div class="card">
     <div class="card-title"><span>🔐</span> เข้าสู่ระบบ</div>
-    <p class="card-desc">กรุณากรอกหมายเลขโทรศัพท์หน่วยของท่าน (หมายเลข 5 ตัว)</p>
 
-    <div class="otp-wrap" id="otpWrap">
-      <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d0">
-      <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d1">
-      <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d2">
-      <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d3">
-      <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d4">
+    <div class="pending-msg" id="pendingMsg"></div>
+
+    <!-- ── ขั้นตอนที่ 1: ยืนยันตัวตนด้วย LINE ── -->
+    <div id="step-line">
+      <div class="step-badge">ขั้นตอนที่ 1 / 2</div>
+      <p class="card-desc">ยืนยันตัวตนด้วยบัญชี LINE ของท่านก่อน</p>
+      <button class="btn-line" id="btnLine" onclick="loginWithLine()">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 5.94 2 10.8c0 4.36 3.6 8.01 8.46 8.7.33.07.78.22.9.5.1.26.07.66.03.92l-.15.9c-.04.26-.2 1.02.89.56s5.9-3.47 8.05-5.94C21.6 14.05 22 12.5 22 10.8 22 5.94 17.52 2 12 2z"/></svg>
+        <span id="lineBtnText">เข้าสู่ระบบด้วย LINE</span>
+      </button>
     </div>
 
-    <div class="error-msg" id="errorMsg">
-      ⚠️ ท่านกรอกหมายเลขไม่ถูกต้อง<br>กรุณาติดต่อแอดมิน ผกพ.ฯ
+    <!-- แสดงหลังยืนยัน LINE สำเร็จ -->
+    <div class="line-profile" id="lineProfileBox" style="display:none">
+      <img id="lineAvatar" src="" alt="">
+      <div class="lp-text">ยืนยันตัวตนแล้ว<br><b id="lineNameLabel"></b></div>
+      <button class="link-btn" onclick="resetLineStep()">เปลี่ยนบัญชี</button>
     </div>
 
-    <button class="btn-login" id="btnLogin" onclick="doLogin()">
-      <span id="btnText">เข้าสู่ระบบ</span>
-      <div class="spinner" id="spinner"></div>
-    </button>
+    <!-- ── ขั้นตอนที่ 2: กรอกรหัสหน่วย ── -->
+    <div id="step-pin" style="display:none">
+      <div class="step-badge">ขั้นตอนที่ 2 / 2</div>
+      <p class="card-desc">กรุณากรอกหมายเลขโทรศัพท์หน่วยของท่าน (หมายเลข 5 ตัว)</p>
+
+      <div class="otp-wrap" id="otpWrap">
+        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d0">
+        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d1">
+        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d2">
+        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d3">
+        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d4">
+      </div>
+
+      <div class="error-msg" id="errorMsg">
+        ⚠️ ท่านกรอกหมายเลขไม่ถูกต้อง<br>กรุณาติดต่อแอดมิน ผกพ.ฯ
+      </div>
+
+      <button class="btn-login" id="btnLogin" onclick="doLogin()">
+        <span id="btnText">เข้าสู่ระบบ</span>
+        <div class="spinner" id="spinner"></div>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -329,6 +401,109 @@ function playSaveFail(){
 window.playSaveSuccess = playSaveSuccess;
 window.playSaveFail = playSaveFail;
 
+// ── ขั้นตอนที่ 1: LINE Login (แค่ยืนยันว่าเป็นใคร ยังไม่ให้เข้าระบบ) ──
+function loginWithLine(){
+  const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  sessionStorage.setItem('line_oauth_state', state);
+  const redirectUri = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: LINE_CHANNEL_ID,
+    redirect_uri: redirectUri,
+    state: state,
+    scope: 'profile openid'
+  });
+  window.location.href = 'https://access.line.me/oauth2/v2.1/authorize?' + params.toString();
+}
+
+function showPending(msg){
+  const el = document.getElementById('pendingMsg');
+  el.textContent = '⚠️ ' + msg;
+  el.classList.add('show');
+}
+function clearPending(){
+  document.getElementById('pendingMsg').classList.remove('show');
+}
+
+async function verifyLineLogin(code){
+  const btn = document.getElementById('btnLine');
+  const btnText = document.getElementById('lineBtnText');
+  btn.disabled = true;
+  btnText.textContent = 'กำลังยืนยันตัวตนผ่าน LINE...';
+
+  try {
+    const url = GAS_API_URL + '?action=lineLogin&code=' + encodeURIComponent(code)
+              + '&redirect_uri=' + encodeURIComponent(window.location.origin + window.location.pathname);
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.success) {
+      // ยืนยันตัวตน LINE สำเร็จ — เก็บไว้ชั่วคราว แล้วไปขั้นตอนที่ 2 (ยังไม่ล็อกอินจริง)
+      sessionStorage.setItem('line_pending_userId', data.lineUserId);
+      sessionStorage.setItem('line_pending_name', data.lineName || '');
+      sessionStorage.setItem('line_pending_picture', data.linePicture || '');
+      goToPinStep();
+    } else {
+      playLoginFail();
+      showPending(data.message || 'ยืนยันตัวตนกับ LINE ไม่สำเร็จ กรุณาลองใหม่');
+      btn.disabled = false; btnText.textContent = 'เข้าสู่ระบบด้วย LINE';
+    }
+  } catch(err) {
+    playLoginFail();
+    showPending('เชื่อมต่อไม่สำเร็จ: ' + err.message);
+    btn.disabled = false; btnText.textContent = 'เข้าสู่ระบบด้วย LINE';
+  }
+}
+
+function goToPinStep(){
+  clearPending();
+  const name = sessionStorage.getItem('line_pending_name') || '';
+  const pic = sessionStorage.getItem('line_pending_picture') || '';
+  document.getElementById('lineNameLabel').textContent = name;
+  document.getElementById('lineAvatar').src = pic;
+  document.getElementById('step-line').style.display = 'none';
+  document.getElementById('lineProfileBox').style.display = 'flex';
+  document.getElementById('step-pin').style.display = 'block';
+  setTimeout(()=>document.getElementById('d0').focus(), 100);
+}
+
+function resetLineStep(){
+  sessionStorage.removeItem('line_pending_userId');
+  sessionStorage.removeItem('line_pending_name');
+  sessionStorage.removeItem('line_pending_picture');
+  document.getElementById('step-line').style.display = 'block';
+  document.getElementById('lineProfileBox').style.display = 'none';
+  document.getElementById('step-pin').style.display = 'none';
+  document.getElementById('btnLine').disabled = false;
+  document.getElementById('lineBtnText').textContent = 'เข้าสู่ระบบด้วย LINE';
+  boxes.forEach(b => { b.value=''; b.classList.remove('filled','error','success'); });
+  clearPending(); clearError();
+}
+
+// ── ตรวจว่ากำลังถูก redirect กลับมาจาก LINE หรือไม่ (มี ?code=...&state=...) ──
+(function checkLineCallback(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const lineError = params.get('error');
+  if (!code && !lineError) return;
+
+  // ล้าง query string ออกจาก URL กันกดรีเฟรชแล้วยิงซ้ำ
+  history.replaceState({}, document.title, window.location.pathname);
+
+  if (lineError) {
+    showPending('ยกเลิกการเข้าสู่ระบบด้วย LINE');
+    return;
+  }
+  const savedState = sessionStorage.getItem('line_oauth_state');
+  sessionStorage.removeItem('line_oauth_state');
+  if (!state || state !== savedState) {
+    showPending('การยืนยันตัวตนไม่ถูกต้อง (state ไม่ตรงกัน) กรุณาลองใหม่');
+    return;
+  }
+  verifyLineLogin(code);
+})();
+
 // ── OTP Input Logic ──
 const boxes = Array.from(document.querySelectorAll('.otp-box'));
 
@@ -366,8 +541,7 @@ boxes.forEach((box, i) => {
   });
 });
 
-// Focus first box on load
-boxes[0].focus();
+// ไม่ auto-focus ช่อง OTP แล้ว เพราะเป็นทางเลือกสำรองที่พับซ่อนไว้ตอนแรก (ใช้ตอนกดปุ่ม "ใช้รหัสหน่วยแทน")
 
 function updateFilled(){
   boxes.forEach(b => b.classList.toggle('filled', b.value.length > 0));
@@ -400,8 +574,12 @@ async function doLogin(){
   spinner.style.display = 'block';
 
   try {
-    // Call GAS to verify unit number and log access
-    const url = GAS_API_URL + '?action=login&code=' + encodeURIComponent(code);
+    // Call GAS to verify unit number and log access — ส่ง LINE user id ที่ยืนยันไว้จากขั้นตอนที่ 1 ไปด้วย
+    const lineUserId = sessionStorage.getItem('line_pending_userId') || '';
+    const lineName = sessionStorage.getItem('line_pending_name') || '';
+    const url = GAS_API_URL + '?action=login&code=' + encodeURIComponent(code)
+              + '&lineUserId=' + encodeURIComponent(lineUserId)
+              + '&lineName=' + encodeURIComponent(lineName);
     const res = await fetch(url);
     const data = await res.json();
 
@@ -409,7 +587,12 @@ async function doLogin(){
       // Save session
       sessionStorage.setItem('unitName', data.unitName);
       sessionStorage.setItem('unitCode', code);
+      sessionStorage.setItem('lineUserId', lineUserId);
       sessionStorage.setItem('loggedIn', '1');
+      // เคลียร์ค่าชั่วคราวของขั้นตอนที่ 1
+      sessionStorage.removeItem('line_pending_userId');
+      sessionStorage.removeItem('line_pending_name');
+      sessionStorage.removeItem('line_pending_picture');
 
       // Mark boxes success
       boxes.forEach(b => b.classList.add('success'));
