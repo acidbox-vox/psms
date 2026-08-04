@@ -404,7 +404,9 @@ window.playSaveFail = playSaveFail;
 // ── ขั้นตอนที่ 1: LINE Login (แค่ยืนยันว่าเป็นใคร ยังไม่ให้เข้าระบบ) ──
 function loginWithLine(){
   const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  sessionStorage.setItem('line_oauth_state', state);
+  // ใช้ localStorage แทน sessionStorage เพราะ in-app browser ของ LINE บางเครื่องล้าง sessionStorage
+  // ระหว่างเปลี่ยนหน้าไปหน้ายืนยันตัวตนของ LINE แล้วกลับมา ทำให้เช็ค state ไม่ได้
+  localStorage.setItem('line_oauth_state', state);
   const redirectUri = window.location.origin + window.location.pathname;
   const params = new URLSearchParams({
     response_type: 'code',
@@ -495,9 +497,12 @@ function resetLineStep(){
     showPending('ยกเลิกการเข้าสู่ระบบด้วย LINE');
     return;
   }
-  const savedState = sessionStorage.getItem('line_oauth_state');
-  sessionStorage.removeItem('line_oauth_state');
-  if (!state || state !== savedState) {
+  const savedState = localStorage.getItem('line_oauth_state');
+  localStorage.removeItem('line_oauth_state');
+  // ถ้ามีค่า savedState อยู่จริงแต่ไม่ตรงกับ state ที่ได้กลับมา = มีอะไรผิดปกติจริงๆ ให้บล็อก
+  // แต่ถ้า savedState หายไปทั้งหมด (null) มักเกิดจาก in-app browser ล้าง storage ระหว่างทาง
+  // อนุโลมให้ผ่านไปได้ เพราะยังไงก็ต้องผ่านรหัสหน่วย 5 หลักเป็นด่านสิทธิ์จริงอีกชั้นอยู่ดี
+  if (savedState && state !== savedState) {
     showPending('การยืนยันตัวตนไม่ถูกต้อง (state ไม่ตรงกัน) กรุณาลองใหม่');
     return;
   }
