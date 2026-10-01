@@ -308,6 +308,11 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
         <option value="12">ธันวาคม</option>
       </select>
     </div>
+    <div class="sel-wrap">
+      <select id="f-year" onchange="onFilterChange()">
+        <option value="">ทุกปี</option>
+      </select>
+    </div>
     <div class="sel-wrap search-wrap">
       <input type="text" id="f-search" placeholder="🔍 ค้นหารายชื่อ..." oninput="applyFilters()" autocomplete="off">
     </div>
@@ -324,7 +329,7 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
       <span id="t-count"></span>
     </div>
     <div class="tbl-scroll">
-      <div id="tbody"><div class="empty-state"><div class="ei">🗂️</div><p>เลือกแผนกและเดือน แล้วกด <strong>แสดง</strong></p></div></div>
+      <div id="tbody"><div class="empty-state"><div class="ei">🗂️</div><p>เลือกแผนก เดือน และปี แล้วกด <strong>แสดง</strong></p></div></div>
     </div>
   </div>
 
@@ -380,7 +385,26 @@ function showToast(msg,type) { const t=document.getElementById('toast'); t.inner
   const now = new Date();
   const mm = String(now.getMonth()+1).padStart(2,'0');
   document.getElementById('f-month').value = mm;
+  buildYearOptions([], String(now.getFullYear()));
 })();
+
+// สร้างตัวเลือกปี (แสดง พ.ศ. / ค่า = ค.ศ.) — ครอบคลุมปีปัจจุบัน ±, และปีที่มีในข้อมูล
+function buildYearOptions(data, selected) {
+  const sel = document.getElementById('f-year');
+  const cur = new Date().getFullYear();
+  const years = new Set([cur-2, cur-1, cur, cur+1]);
+  (data||[]).forEach(r => {
+    [r.dateFrom, r.dateTo].forEach(d => {
+      const y = parseInt(String(d||'').slice(0,4),10);
+      if (y>1900 && y<2200) years.add(y);
+    });
+  });
+  const keep = selected !== undefined ? selected : sel.value;
+  sel.innerHTML = '<option value="">ทุกปี</option>' +
+    [...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
+  sel.value = keep;
+  if (sel.value !== keep) sel.value = '';
+}
 
 window.onload = async function(){ await initPage(); if(window.Loader)Loader.hide(); };
 
@@ -421,6 +445,7 @@ async function loadData(force) {
   try {
     allData = await dataPromise;
     dataLoaded = true;
+    buildYearOptions(allData);
     // sync dept dropdown ถ้าข้อมูลมาจาก getLeaves
     const depts = [...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
     const sel = document.getElementById('f-dept'); const cur = sel.value;
@@ -446,6 +471,7 @@ function onFilterChange() {
 function applyFilters() {
   const dept   = document.getElementById('f-dept').value;
   const month  = document.getElementById('f-month').value;
+  const year   = document.getElementById('f-year').value;
   const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
 
   // ต้องเลือกแผนกก่อนเสมอ
@@ -464,17 +490,28 @@ function applyFilters() {
 
   let rows = allData.filter(r => {
     if (deptFilter && r.dept !== deptFilter) return false;
-    if (month) {
-      const from = r.dateFrom || '', to = r.dateTo || r.dateFrom || '';
+    if (month || year) {
+      const from = (r.dateFrom || '').slice(0,10), to = (r.dateTo || r.dateFrom || '').slice(0,10);
       if (!from) return false;
-      const startDate = new Date(from.slice(0,4), +from.slice(5,7)-1, 1);
-      const endDate   = new Date(to.slice(0,4),   +to.slice(5,7)-1,   28);
-      let found = false;
-      for (let y = startDate.getFullYear(); y <= endDate.getFullYear()+1; y++) {
-        const check = new Date(y, +month-1, 15);
-        if (check >= startDate && check <= endDate) { found=true; break; }
+      if (year) {
+        // กรองตามปีที่เลือก: รายการต้องคาบเกี่ยวกับช่วง (เดือนนั้นของปีนั้น / ทั้งปี)
+        let rs, re;
+        if (month) {
+          const last = new Date(+year, +month, 0).getDate();
+          rs = `${year}-${month}-01`; re = `${year}-${month}-${String(last).padStart(2,'0')}`;
+        } else { rs = `${year}-01-01`; re = `${year}-12-31`; }
+        if (from > re || to < rs) return false;
+      } else {
+        // ทุกปี + เลือกเดือน: ตรวจทุกปีที่รายการครอบคลุม
+        const y1 = +from.slice(0,4), y2 = +to.slice(0,4);
+        let found = false;
+        for (let y = y1; y <= y2; y++) {
+          const last = new Date(y, +month, 0).getDate();
+          const rs = `${y}-${month}-01`, re = `${y}-${month}-${String(last).padStart(2,'0')}`;
+          if (!(from > re || to < rs)) { found = true; break; }
+        }
+        if (!found) return false;
       }
-      if (!found) return false;
     }
     if (search) {
       if (!(r.name||'').toLowerCase().includes(search)) return false;
@@ -524,16 +561,19 @@ async function doDelete() {
 function clearFilters() {
   document.getElementById('f-dept').value  = '';
   document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
+  document.getElementById('f-year').value  = String(new Date().getFullYear());
   document.getElementById('f-search').value = '';
   showPrompt();
 }
 function openReport(mode) {
   const dept   = document.getElementById('f-dept').value;
   const month  = document.getElementById('f-month').value;
+  const year   = document.getElementById('f-year').value;
   const search = (document.getElementById('f-search').value||'').trim();
   const params = new URLSearchParams({ mode: mode||'normal' });
   if (dept)   params.set('dept',   dept);
   if (month)  params.set('month',  month);
+  if (year)   params.set('year',   year);
   if (search) params.set('search', search);
   window.location.href = 'leave-report.html?' + params.toString();
 }
