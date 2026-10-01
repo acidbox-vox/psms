@@ -321,6 +321,12 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
             </select>
           </div>
         </div>
+        <div class="filter-group" id="group-year" style="min-width:130px">
+          <label>ปี</label>
+          <div class="sel-wrap">
+            <select id="f-year"><option value="">ทุกปี</option></select>
+          </div>
+        </div>
         <div id="group-range" style="display:none;flex:1;min-width:300px">
           <div class="filter-row" style="gap:8px">
             <div class="filter-group">
@@ -454,6 +460,7 @@ function setMode(mode){
   document.getElementById('btn-mode-month').classList.toggle('active', mode==='month');
   document.getElementById('btn-mode-range').classList.toggle('active', mode==='range');
   document.getElementById('group-month').style.display = mode==='month'?'':'none';
+  document.getElementById('group-year').style.display = mode==='month'?'':'none';
   document.getElementById('group-range').style.display = mode==='range'?'':'none';
 }
 
@@ -525,6 +532,7 @@ window.onload = async function(){ var __hid=false; var __hideOnce=function(){if(
   setTimeout(__hideOnce, 8000); // กันลูปโหลดค้าง — ซ่อน loader แน่นอนภายใน 8 วิ ไม่ว่าจะเกิดอะไรขึ้น
   buildTypeChecks();
   document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
+  buildYearOptions([], String(new Date().getFullYear()));
   const now=new Date(),y=now.getFullYear(),m=now.getMonth();
   const last=new Date(y,m+1,0);
   document.getElementById('f-date-from').value=`${y}-${String(m+1).padStart(2,'0')}-01`;
@@ -547,9 +555,11 @@ window.onload = async function(){ var __hid=false; var __hideOnce=function(){if(
   const urlParams = new URLSearchParams(window.location.search);
   const urlDept   = urlParams.get('dept');
   const urlMonth  = urlParams.get('month');
+  const urlYear   = urlParams.get('year');
   const urlSearch = urlParams.get('search');
   if(urlDept)   document.getElementById('f-dept').value   = urlDept;
   if(urlMonth)  document.getElementById('f-month').value  = urlMonth;
+  if(urlYear)   buildYearOptions([], urlYear);
   if(urlSearch) document.getElementById('f-search').value = urlSearch;
   // ถ้ามี param มา ให้โหลดและแสดงเลย
   if(urlDept || urlSearch) {
@@ -680,6 +690,7 @@ async function loadData(force){
     updateProgress(95,'🗂️ เตรียมรายชื่อ...');
     allData = data || [];
     dataLoaded=true;
+    buildYearOptions(allData);
 
     // sync dept dropdown
     const depts=[...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
@@ -702,11 +713,29 @@ async function loadData(force){
   }
 }
 
+/* ── ตัวเลือกปี (แสดง พ.ศ. / ค่า = ค.ศ.) ── */
+function buildYearOptions(data, selected){
+  const sel=document.getElementById('f-year');
+  const cur=new Date().getFullYear();
+  const years=new Set([cur-2,cur-1,cur,cur+1]);
+  (data||[]).forEach(r=>{[r.dateFrom,r.dateTo].forEach(d=>{
+    const y=parseInt(String(d||'').slice(0,4),10);
+    if(y>1900&&y<2200) years.add(y);
+  });});
+  const keep=selected!==undefined?selected:sel.value;
+  if(keep&&!isNaN(+keep)) years.add(+keep);
+  sel.innerHTML='<option value="">ทุกปี</option>'+
+    [...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">พ.ศ. ${y+543}</option>`).join('');
+  sel.value=keep;
+  if(sel.value!==keep) sel.value='';
+}
+
 /* ── Filter logic ── */
 function filterRows(){
   const dept=document.getElementById('f-dept').value;
   const deptFilter=dept==='ALL'?'':dept;
   const month=document.getElementById('f-month').value;
+  const year=document.getElementById('f-year').value;
   const dateFrom=document.getElementById('f-date-from').value;
   const dateTo=document.getElementById('f-date-to').value;
   const selTypes=getSelectedTypes();
@@ -720,15 +749,22 @@ function filterRows(){
     if(!selTypes.includes(baseType(r.leaveType))) return false;
     // ช่วงเวลา
     const rFrom=toISO(r.dateFrom), rTo=toISO(r.dateTo||r.dateFrom);
-    if(currentMode==='month' && month){
+    if(currentMode==='month' && (month||year)){
       if(!rFrom) return false;
-      const sd=new Date(rFrom.slice(0,4),+rFrom.slice(5,7)-1,1);
-      const ed=new Date(rTo.slice(0,4),+rTo.slice(5,7)-1,28);
-      let found=false;
-      for(let y=sd.getFullYear();y<=ed.getFullYear()+1;y++){
-        if(new Date(y,+month-1,15)>=sd&&new Date(y,+month-1,15)<=ed){found=true;break;}
+      if(year){
+        let rs,re;
+        if(month){const last=new Date(+year,+month,0).getDate();rs=`${year}-${month}-01`;re=`${year}-${month}-${String(last).padStart(2,'0')}`;}
+        else{rs=`${year}-01-01`;re=`${year}-12-31`;}
+        if(rFrom>re||rTo<rs) return false;
+      }else{
+        let found=false;
+        for(let y=+rFrom.slice(0,4);y<=+rTo.slice(0,4);y++){
+          const last=new Date(y,+month,0).getDate();
+          const rs=`${y}-${month}-01`,re=`${y}-${month}-${String(last).padStart(2,'0')}`;
+          if(!(rFrom>re||rTo<rs)){found=true;break;}
+        }
+        if(!found) return false;
       }
-      if(!found) return false;
     }
     if(currentMode==='range'&&(dateFrom||dateTo)){
       if(!rFrom) return false;
@@ -742,6 +778,7 @@ function filterRows(){
 function renderReport(){
   const dept=document.getElementById('f-dept').value;
   const month=document.getElementById('f-month').value;
+  const year=document.getElementById('f-year').value;
   const dateFrom=document.getElementById('f-date-from').value;
   const dateTo=document.getElementById('f-date-to').value;
   const unitName=sessionStorage.getItem('unitName')||'';
@@ -756,7 +793,7 @@ function renderReport(){
   if(selectedPeople.length) subtitle+=`รายชื่อที่เลือก: ${selectedPeople.join(', ')}`;
   else if(dept&&dept!=='ALL') subtitle+=`แผนก: ${dept}`;
   else if(dept==='ALL') subtitle+='ทุกแผนก';
-  if(currentMode==='month'&&month) subtitle+=(subtitle?' | ':'')+`เดือน: ${TH_M_FULL[+month]}`;
+  if(currentMode==='month'&&month) subtitle+=(subtitle?' | ':'')+`เดือน: ${TH_M_FULL[+month]}${year?' '+(+year+543):''}`;
   else if(currentMode==='range'&&(dateFrom||dateTo))
     subtitle+=(subtitle?' | ':'')+`${thDate(dateFrom)} – ${thDate(dateTo)}`;
   if(selTypes.length<TYPE_ALL.length)
@@ -997,6 +1034,7 @@ function exportExcel(){
 function doExportExcel(rows){
   const dept=document.getElementById('f-dept').value;
   const month=document.getElementById('f-month').value;
+  const year=document.getElementById('f-year').value;
   const dateFrom=document.getElementById('f-date-from').value;
   const dateTo=document.getElementById('f-date-to').value;
   const unitName=sessionStorage.getItem('unitName')||'';
@@ -1039,7 +1077,7 @@ function doExportExcel(rows){
     ['รายงานสถานะการจำหน่ายกำลังพล'],
   ];
   if(dept) titleRows.push([`แผนก: ${dept==='ALL'?'ทุกแผนก':dept}`]);
-  if(currentMode==='month'&&month) titleRows.push([`เดือน: ${TH_M_FULL[+month]}`]);
+  if(currentMode==='month'&&month) titleRows.push([`เดือน: ${TH_M_FULL[+month]}${year?' '+(+year+543):''}`]);
   if(currentMode==='range'&&(dateFrom||dateTo)) titleRows.push([`ช่วง: ${thDate(dateFrom)} – ${thDate(dateTo)}`]);
   if(pill117Str) titleRows.push([pill117Str]);
   titleRows.push([`พิมพ์เมื่อ: ${nowTH()}`],['']);
@@ -1075,7 +1113,7 @@ function doExportExcel(rows){
   // filename
   let fname='รายงานจำหน่าย';
   if(dept&&dept!=='ALL') fname+=`_${dept}`;
-  if(currentMode==='month'&&month) fname+=`_${TH_M_FULL[+month]}`;
+  if(currentMode==='month'&&month) fname+=`_${TH_M_FULL[+month]}${year?'_'+(+year+543):''}`;
   else if(currentMode==='range'&&dateFrom) fname+=`_${dateFrom}`;
   XLSX.writeFile(wb,`${fname}.xlsx`);
 }
@@ -1083,6 +1121,7 @@ function doExportExcel(rows){
 function clearFilters(){
   document.getElementById('f-dept').value='';
   document.getElementById('f-month').value=String(new Date().getMonth()+1).padStart(2,'0');
+  document.getElementById('f-year').value=String(new Date().getFullYear());
   document.getElementById('f-search') && (document.getElementById('f-search').value='');
   selectedPeople=[];renderTags();
   buildTypeChecks();
