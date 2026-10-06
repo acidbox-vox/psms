@@ -385,11 +385,14 @@ async function doLogin(ev){
 
   try {
     // POST — รหัสผ่านอยู่ใน body ไม่ปรากฏใน URL / ประวัติเบราว์เซอร์
+    const t0 = performance.now();
     const res = await fetch(GAS_API_URL, {
       method: 'POST',
       body: JSON.stringify({ action: 'login', username: username, password: password })
     });
     const data = await res.json();
+    // เวลารวม (ms) เทียบกับเวลาที่ GAS ทำงานจริง — ส่วนต่าง = เครือข่าย/cold start (ดูได้ที่ DevTools → Console)
+    console.log('[login] รวม ' + Math.round(performance.now() - t0) + ' ms | GAS ทำงาน ' + (data.ms != null ? data.ms : '?') + ' ms');
 
     if(data.success){
       // เคลียร์ค่าเก่าจากระบบเดิม (LINE / รหัสหน่วย) กันค้าง
@@ -408,7 +411,7 @@ async function doLogin(ev){
       // เริ่ม preload ข้อมูลระหว่างรอ redirect — พอไปถึงหน้าอื่น cache พร้อมแล้ว
       if(window.DataCache) DataCache.preload();
 
-      setTimeout(() => { window.location.href = 'index.html'; }, 1800);
+      setTimeout(() => { window.location.href = 'index.html'; }, 600);
     } else {
       flagField(elUser); flagField(elPass);
       showError(data.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
@@ -427,6 +430,9 @@ async function doLogin(ev){
 }
 
 elUser.focus();
+
+// อุ่นเครื่อง GAS ระหว่างที่ผู้ใช้พิมพ์ชื่อผู้ใช้/รหัสผ่าน — ลดอาการ "cold start" ครั้งแรกที่กดล็อกอินช้า
+fetch(GAS_API_URL + '?action=ping').catch(function(){});
 </script>
 <script>if(window.Loader)Loader.hide();</script>
 </body>
