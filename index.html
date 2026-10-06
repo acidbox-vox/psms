@@ -286,10 +286,10 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
   transition:all .2s ease;
 ">🚪 ออกจากระบบ</button>
 <script>
-// Show unit name
-var uName = sessionStorage.getItem('unitName');
+// แสดงชื่อผู้ล็อกอิน
+var uName = sessionStorage.getItem('userName') || sessionStorage.getItem('unitName');
 var badge = document.getElementById('unitBadge');
-if(uName && badge){ badge.textContent = '📞 ' + uName; }
+if(uName && badge){ badge.textContent = '👤 ' + uName; }
 
 // Preload ข้อมูลล่วงหน้าขณะอยู่หน้าหลัก
 // รอ preload เสร็จก่อน แล้ว loader ค่อยปิด → หน้าถัดไปได้ cache ทันที
@@ -308,6 +308,8 @@ if(window.DataCache) {
 
 function doLogout(){
   sessionStorage.removeItem('loggedIn');
+  sessionStorage.removeItem('userName');
+  sessionStorage.removeItem('username');
   sessionStorage.removeItem('unitName');
   sessionStorage.removeItem('unitCode');
   if(window.DataCache) DataCache.invalidate();
