@@ -4,11 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>รายงานสถานะจำหน่าย</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet"></noscript>
 <script src="js/api-config.js"></script>
 <script src="js/cache.js"></script>
 <script src="js/loader.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
 :root{
@@ -529,6 +533,7 @@ function setReportMode(mode){
 }
 
 window.onload = async function(){ var __hid=false; var __hideOnce=function(){if(!__hid){__hid=true;if(window.Loader)Loader.hide();}};
+  setTimeout(function(){ if(window.loadXLSX) loadXLSX().catch(function(){}); }, 2500); // เตรียมไลบรารี Excel ไว้เบื้องหลัง
   setTimeout(__hideOnce, 8000); // กันลูปโหลดค้าง — ซ่อน loader แน่นอนภายใน 8 วิ ไม่ว่าจะเกิดอะไรขึ้น
   buildTypeChecks();
   document.getElementById('f-month').value = String(new Date().getMonth()+1).padStart(2,'0');
@@ -633,9 +638,9 @@ async function loadData(force){
   if(cached){
     showProgress(30,'📦 อ่านจาก cache...');
     setPeopleStatus('loading','กำลังเตรียมข้อมูล...');
-    await new Promise(r=>setTimeout(r,80));
+    await new Promise(r=>setTimeout(r,0));
     updateProgress(80,'✅ โหลดจาก cache สำเร็จ');
-    await new Promise(r=>setTimeout(r,120));
+    await new Promise(r=>setTimeout(r,0));
   } else {
     showProgress(5,'🌐 กำลังเชื่อมต่อ GAS...');
     setPeopleStatus('loading','กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...');
@@ -686,7 +691,7 @@ async function loadData(force){
         updateProgress(88,'🔄 ประมวลผล...');
       }
     }
-    await new Promise(r=>setTimeout(r,100));
+    await new Promise(r=>setTimeout(r,0));
     updateProgress(95,'🗂️ เตรียมรายชื่อ...');
     allData = data || [];
     dataLoaded=true;
@@ -704,7 +709,7 @@ async function loadData(force){
 
     updateProgress(100,'✅ โหลดสำเร็จ '+allData.length+' รายการ');
     setPeopleStatus('ready',`✅ พร้อมค้นหา — มีข้อมูล ${allData.length} รายการ`);
-    await new Promise(r=>setTimeout(r,400));
+    await new Promise(r=>setTimeout(r,0));
     renderReport();
   }catch(e){
     setPeopleStatus('empty','❌ โหลดไม่สำเร็จ');
@@ -1011,7 +1016,12 @@ function exportExcel(){
   const btn=document.getElementById('btn-excel');
   if(btn.disabled) return; // กันคลิกซ้ำระหว่างกำลังสร้างไฟล์ (ทำให้ได้ไฟล์ไม่สมบูรณ์)
   if(typeof XLSX==='undefined'){
-    alert('ไลบรารีสำหรับสร้างไฟล์ Excel ยังโหลดไม่เสร็จ (อาจเป็นเพราะอินเทอร์เน็ตช้า หรือ CDN ถูกบล็อก) กรุณารอสักครู่แล้วลองใหม่อีกครั้ง');
+    const __lbl=btn.innerHTML; btn.disabled=true; btn.innerHTML='⏳ กำลังโหลดตัวสร้างไฟล์...';
+    const __msg='ไลบรารีสำหรับสร้างไฟล์ Excel ยังโหลดไม่เสร็จ (อาจเป็นเพราะอินเทอร์เน็ตช้า หรือ CDN ถูกบล็อก) กรุณารอสักครู่แล้วลองใหม่อีกครั้ง';
+    window.loadXLSX().then(function(){
+      btn.disabled=false; btn.innerHTML=__lbl;
+      if(typeof XLSX!=='undefined') exportExcel(); else alert(__msg);   // กันเรียกซ้ำวนไม่จบถ้าโหลดแล้วยังไม่มี XLSX
+    },function(){ btn.disabled=false; btn.innerHTML=__lbl; alert(__msg); });
     return;
   }
   const rows=filterRows();

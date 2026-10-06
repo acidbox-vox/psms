@@ -4,7 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>กำลังพลว่าง</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet"></noscript>
 <script src="js/api-config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
@@ -202,7 +207,7 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
       </select>
     </div>
     <div class="sel-wrap">
-      <select id="f-month" onchange="applyFilter()"><!-- JS --></select>
+      <select id="f-month" onchange="onMonthChange()"><!-- JS --></select>
     </div>
     <button class="btn-sm" onclick="loadData(true)">🔄 ดูการอัพเดทข้อมูลล่าสุด</button>
   </div>
@@ -232,23 +237,41 @@ function buildMonthOptions() {
   for (let i=-3;i<=9;i++) { const d=new Date(now.getFullYear(),now.getMonth()+i,1); const y=d.getFullYear(),m=d.getMonth(); const val=`${y}-${pad(m+1)}`; sel.innerHTML+=`<option value="${val}"${i===0?' selected':''}>${TH_M_FULL[m]} ${y+543}</option>`; }
 }
 window.onload = async function() { buildMonthOptions(); await loadData(); if(window.Loader)Loader.hide(); };
-async function loadData() {
+// โหลดเป็น 2 ขั้น: (1) แผนก+รายชื่อ จาก cache/GAS (เล็ก) → เติม dropdown ทันที
+// (2) ประวัติการลา "เฉพาะเดือนที่เลือก" ให้เซิร์ฟเวอร์กรองมาให้ แทนการโหลดประวัติทั้งชีตหมื่นแถว
+let loadSeq = 0;
+async function loadData(force) {
+  const seq = ++loadSeq;
   document.getElementById('result-area').innerHTML='<div class="loading-row"><span class="spinner"></span> กำลังโหลด...</div>';
   document.getElementById('summary-row').style.display='none';
   if (!API) { document.getElementById('result-area').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
   try {
-    if (window.DataCache) {
-      [deptMap, allLeaves] = await Promise.all([DataCache.getDepts(), DataCache.getLeaves()]);
-    } else {
-      const [deptRes,leavesRes]=await Promise.all([fetch(API+'?action=getDepts'),fetch(API+'?action=getLeaves')]);
-      deptMap=await deptRes.json()||{}; allLeaves=await leavesRes.json()||[];
-    }
+    deptMap = window.DataCache ? await DataCache.getDepts(force) : (await (await fetch(API+'?action=getDepts')).json() || {});
+    if (seq !== loadSeq) return;
     const depts=Object.keys(deptMap).sort(); const dsel=document.getElementById('f-dept'); const cur=dsel.value;
     dsel.innerHTML='<option value="">ทุกแผนก</option>';
     depts.forEach(d=>dsel.innerHTML+=`<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
-    applyFilter();
+    await loadMonthLeaves(force);
   } catch(e) { document.getElementById('result-area').innerHTML=`<div class="empty-state"><div class="ei">❌</div><p>โหลดไม่ได้: ${e.message}</p></div>`; }
 }
+async function loadMonthLeaves(force) {
+  const seq = ++loadSeq;
+  const [y,m] = document.getElementById('f-month').value.split('-');
+  document.getElementById('result-area').innerHTML='<div class="loading-row"><span class="spinner"></span> กำลังโหลด...</div>';
+  document.getElementById('summary-row').style.display='none';
+  try {
+    let rows;
+    if (window.DataCache) rows = await DataCache.getLeavesFiltered({year:y, month:m}, force);
+    else {
+      const raw = await (await fetch(API+'?action=getLeaves&compact=1&year='+y+'&month='+m)).json() || [];
+      rows = raw.map(a=>Array.isArray(a)?{name:a[0],dept:a[1],leaveType:a[2],dateFrom:a[3],dateTo:a[4]}:a);
+    }
+    if (seq !== loadSeq) return;     // ผู้ใช้เปลี่ยนเดือนซ้ำระหว่างโหลด — ทิ้งผลเก่า
+    allLeaves = rows;
+    applyFilter();
+  } catch(e) { if (seq === loadSeq) document.getElementById('result-area').innerHTML=`<div class="empty-state"><div class="ei">❌</div><p>โหลดไม่ได้: ${e.message}</p></div>`; }
+}
+function onMonthChange() { loadMonthLeaves(false); }
 function applyFilter() {
   const deptFilter=document.getElementById('f-dept').value, monthVal=document.getElementById('f-month').value;
   const [sy,sm]=monthVal.split('-').map(Number);

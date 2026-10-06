@@ -4,7 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ปฏิทินการจำหน่าย</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet"></noscript>
 <script src="js/api-config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
@@ -252,23 +257,48 @@ let curYear, curMonth;
 const today = new Date(); curYear = today.getFullYear(); curMonth = today.getMonth();
 function pad(n) { return String(n).padStart(2,'0'); }
 function ymd(y,m,d) { return `${y}-${pad(m+1)}-${pad(d)}`; }
-async function loadData() {
-  if (!API) { document.getElementById('cal-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">ยังไม่ตั้งค่า API URL</div>'; return; }
+// โหลดเฉพาะ "เดือนที่กำลังดู" จากเซิร์ฟเวอร์ (เดิมดึงประวัติทั้งชีตหมื่นแถวก่อนจะวาดปฏิทินได้)
+// เดือนข้างเคียงโหลดรอไว้เบื้องหลัง กดก่อนหน้า/ถัดไปจึงแทบไม่ต้องรอ
+const knownDepts = new Set();
+let calSeq = 0;
+function fillDeptOptions() {
+  const sel=document.getElementById('f-dept'); const cur=sel.value;
+  sel.innerHTML='<option value="">ทุกแผนก</option>';
+  [...knownDepts].sort().forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
+  sel.value=cur;
+}
+async function fetchMonthLeaves(y, m, force) {
+  if (window.DataCache) return DataCache.getLeavesFiltered({year:String(y), month:pad(m+1)}, force);
+  const raw = await (await fetch(API+'?action=getLeaves&compact=1&year='+y+'&month='+pad(m+1))).json() || [];
+  return raw.map(a=>Array.isArray(a)?{name:a[0],dept:a[1],leaveType:a[2],dateFrom:a[3],dateTo:a[4]}:a);
+}
+async function loadMonth(force) {
+  const seq=++calSeq, y=curYear, m=curMonth;
+  const grid=document.getElementById('cal-grid'); grid.style.opacity='0.5';
   try {
-    leaves = window.DataCache ? await DataCache.getLeaves() : await fetch(API+'?action=getLeaves').then(r=>r.json()) || [];
-    const depts=[...new Set(leaves.map(l=>l.dept).filter(Boolean))].sort();
-    const sel=document.getElementById('f-dept');
-    sel.innerHTML='<option value="">ทุกแผนก</option>';
-    depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
+    const rows = await fetchMonthLeaves(y, m, force);
+    if (seq!==calSeq) return;           // ผู้ใช้เปลี่ยนเดือนซ้ำระหว่างรอ — ทิ้งผลเก่า
+    leaves = rows;
+    rows.forEach(l=>{ if (l.dept) knownDepts.add(l.dept); });
+    fillDeptOptions();
     buildCalendar();
-  } catch(e) { document.getElementById('cal-grid').innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">❌ โหลดไม่ได้: ${e.message}</div>`; }
+    [-1,1].forEach(delta=>{ const d=new Date(y,m+delta,1); fetchMonthLeaves(d.getFullYear(),d.getMonth(),false).catch(()=>{}); });
+  } catch(e) {
+    if (seq===calSeq) grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">❌ โหลดไม่ได้: ${esc(e.message)}</div>`;
+  } finally { if (seq===calSeq) grid.style.opacity=''; }
+}
+async function loadData(force) {
+  if (!API) { document.getElementById('cal-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">ยังไม่ตั้งค่า API URL</div>'; return; }
+  if (window.DataCache) DataCache.getDepts(force).then(map=>{ Object.keys(map||{}).forEach(d=>knownDepts.add(d)); fillDeptOptions(); }).catch(()=>{});
+  await loadMonth(force);
 }
 function changeMonth(delta) {
   curMonth+=delta;
   if (curMonth>11) { curMonth=0; curYear++; }
   if (curMonth<0)  { curMonth=11; curYear--; }
-  buildCalendar();
+  document.getElementById('month-title').innerText=`${TH_M_FULL[curMonth]} ${curYear+543}`;
   document.getElementById('detail-panel').innerHTML='<div class="detail-empty">คลิกที่วันใดวันหนึ่งเพื่อดูรายละเอียด</div>';
+  loadMonth(false);
 }
 function buildCalendar() {
   document.getElementById('month-title').innerText=`${TH_M_FULL[curMonth]} ${curYear+543}`;

@@ -4,8 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>เข้าสู่ระบบ · ระบบจำหน่ายบุคลากร</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet"></noscript>
 <script src="js/api-config.js"></script>
+<script src="js/cache.js"></script>
 <script src="js/loader.js"></script>
 <style>
 :root {
@@ -408,9 +414,6 @@ async function doLogin(ev){
       document.getElementById('successUnit').textContent = data.name;
       document.getElementById('successOverlay').classList.add('show');
 
-      // เริ่ม preload ข้อมูลระหว่างรอ redirect — พอไปถึงหน้าอื่น cache พร้อมแล้ว
-      if(window.DataCache) DataCache.preload();
-
       setTimeout(() => { window.location.href = 'index.html'; }, 600);
     } else {
       flagField(elUser); flagField(elPass);
@@ -433,6 +436,8 @@ elUser.focus();
 
 // อุ่นเครื่อง GAS ระหว่างที่ผู้ใช้พิมพ์ชื่อผู้ใช้/รหัสผ่าน — ลดอาการ "cold start" ครั้งแรกที่กดล็อกอินช้า
 fetch(GAS_API_URL + '?action=ping').catch(function(){});
+// โหลดแผนกไว้ล่วงหน้าระหว่างที่ผู้ใช้พิมพ์ — พอเข้าระบบแล้วเปิดเมนูไหนก็ได้แผนกทันที (เก็บใน sessionStorage ของแท็บนี้)
+if(window.DataCache) DataCache.getDepts().catch(function(){});
 </script>
 <script>if(window.Loader)Loader.hide();</script>
 </body>

@@ -8,10 +8,9 @@ function doGet(e) {
   const action = e.parameter.action || '';
   let result;
 
-  if      (action === 'login')         return handleLogin(e);
-  else if (action === 'lineLogin')     return handleLineLogin(e);
+  if      (action === 'ping')          result = { ok: true };   // ใช้ "อุ่นเครื่อง" GAS ตอนเปิดหน้าล็อกอิน
   else if (action === 'getDepts')      result = getDepts();
-  else if (action === 'getLeaves')     result = getLeaves();
+  else if (action === 'getLeaves')     result = getLeaves(e.parameter);
   else if (action === 'getStatusData') result = getStatusData();
   else result = { error: 'Unknown action: ' + action };
 
@@ -33,8 +32,9 @@ function doPost(e) {
   const action = data.action;
   let result;
 
-  if      (action === 'saveLeave')   result = saveLeave(data);
-  else if (action === 'deleteLeave') result = deleteLeave(data);
+  if      (action === 'login')       result = handleLogin(data);
+  else if (action === 'saveLeave')   result = withLeavesLock_(function () { return saveLeave(data); });
+  else if (action === 'deleteLeave') result = withLeavesLock_(function () { return deleteLeave(data); });
   else if (action === 'saveDepts')   result = saveDepts(data.depts);
   else result = { error: 'Unknown action: ' + action };
 
@@ -44,145 +44,111 @@ function doPost(e) {
 }
 
 // =============================================================
-//  Login & Access Log
-//  ── flow 2 ขั้นตอน ──
-//  ขั้นตอนที่ 1: handleLineLogin() แค่ยืนยันว่าเป็นบัญชี LINE จริง (ยังไม่เช็คสิทธิ์)
-//  ขั้นตอนที่ 2: handleLogin() เช็ครหัสหน่วย 5 หลัก — นี่คือด่านสิทธิ์จริง ถ้าถูกจึงเข้าระบบได้
-//                พร้อมบันทึก LINE User ID / ชื่อ LINE ที่ยืนยันไว้ในขั้นตอนที่ 1 ลง log ไปด้วย
+//  Login — ตรวจ username / password กับชีต "login"
+//
+//  ชีต "login" ต้องมีหัวตาราง (แถวที่ 1) 3 คอลัมน์ ลำดับไหนก็ได้:
+//      username | password | name
+//  - username ไม่สนตัวพิมพ์เล็ก/ใหญ่ ส่วน password ต้องตรงตามตัวอักษร
+//  - name คือชื่อที่จะแสดงหลังล็อกอิน
+//
+//  การเทียบทำฝั่งเซิร์ฟเวอร์ทั้งหมด เบราว์เซอร์ไม่เคยได้รับข้อมูลในชีตนี้
+//  กันเดารหัส: ผิดครบ 5 ครั้ง (ต่อ username) จะถูกล็อก 10 นาที
+//  บันทึกประวัติการเข้าระบบ (สำเร็จ/ล้มเหลว) ที่ชีต "loginLog" — ไม่บันทึกรหัสผ่าน
 // =============================================================
-function handleLogin(e) {
-  e = e || {};
-  e.parameter = e.parameter || {};
+const LOGIN_SHEET     = 'login';
+const LOGIN_LOG_SHEET = 'loginLog';
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_SEC  = 600;   // 10 นาที
 
-  var code       = String(e.parameter.code || '').trim();
-  var lineUserId = String(e.parameter.lineUserId || '').trim();
-  var lineName   = String(e.parameter.lineName || '').trim();
-
-  if (!code) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, message: 'ไม่พบรหัสหน่วย' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  var ss        = SpreadsheetApp.getActiveSpreadsheet();
-  var unitSheet = ss.getSheetByName('เบอร์หน่วย');
-
-  if (!unitSheet) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, message: 'ไม่พบชีต เบอร์หน่วย' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  var unitData = unitSheet.getDataRange().getValues();
-  var unitName = null;
-
-  for (var i = 1; i < unitData.length; i++) {
-    var phone = String(unitData[i][1] || '').trim();
-    if (phone === code) {
-      unitName = String(unitData[i][0] || '').trim();
-      break;
-    }
-  }
-
-  if (!unitName) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  var logSheet = ss.getSheetByName('log');
-  if (!logSheet) {
-    logSheet = ss.insertSheet('log');
-    logSheet.appendRow(['วันที่', 'เวลา', 'หน่วย', 'เบอร์โทร', 'LINE User ID', 'ชื่อ LINE']);
-  }
-
-  var now = new Date();
-  var tz  = Session.getScriptTimeZone();
-  logSheet.appendRow([
-    Utilities.formatDate(now, tz, 'dd/MM/yyyy'),
-    Utilities.formatDate(now, tz, 'HH:mm:ss'),
-    unitName,
-    code,
-    lineUserId,
-    lineName
-  ]);
-
-  return ContentService
-    .createTextOutput(JSON.stringify({ success: true, unitName: unitName }))
-    .setMimeType(ContentService.MimeType.JSON);
+// ครอบเพื่อวัดเวลาทำงานฝั่งเซิร์ฟเวอร์ (ms) ส่งกลับไปให้หน้าเว็บ log ใน console ไว้ไล่ปัญหาความช้า
+function handleLogin(data) {
+  const t0 = Date.now();
+  const r = handleLoginCore_(data);
+  r.ms = Date.now() - t0;
+  return r;
 }
 
-// ── ขั้นตอนที่ 1 (ยืนยันตัวตนเบื้องต้นด้วย LINE): แลก code เป็น token แล้วดึงโปรไฟล์ ──
-// หมายเหตุ: ฟังก์ชันนี้ "ไม่" เช็คสิทธิ์การเข้าใช้งานใดๆ แค่ยืนยันว่าเป็นบัญชี LINE จริง
-// ตัวเช็คสิทธิ์จริงอยู่ที่ handleLogin() (รหัสหน่วย 5 หลัก) ด้านบน
-//
-// ต้องตั้งค่า Script Properties ก่อนใช้งาน (Project Settings ⚙️ > Script Properties):
-//   LINE_CHANNEL_ID      = Channel ID จาก LINE Developers Console
-//   LINE_CHANNEL_SECRET  = Channel secret จาก LINE Developers Console (ห้ามใส่ในโค้ด/frontend)
-// และตั้งค่า Callback URL ใน LINE Developers Console ให้ตรงกับ URL ของหน้า login.html จริง (ต้องเป็น https)
-// แล้วนำ Channel ID (ตัวเดียวกัน) ไปใส่ในไฟล์ js/api-config.js ที่ตัวแปร LINE_CHANNEL_ID
-function handleLineLogin(e) {
-  e = e || {};
-  e.parameter = e.parameter || {};
-
-  var code        = String(e.parameter.code || '').trim();
-  var redirectUri = String(e.parameter.redirect_uri || '').trim();
-  var props       = PropertiesService.getScriptProperties();
-  var channelId     = props.getProperty('LINE_CHANNEL_ID');
-  var channelSecret = props.getProperty('LINE_CHANNEL_SECRET');
-
-  function respond(obj) {
-    return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+function handleLoginCore_(data) {
+  data = data || {};
+  const username = String(data.username || '').trim();
+  const password = String(data.password || '').trim();
+  if (!username || !password) {
+    return { success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' };
   }
 
-  if (!channelId || !channelSecret) {
-    return respond({ success: false, message: 'ยังไม่ได้ตั้งค่า LINE_CHANNEL_ID / LINE_CHANNEL_SECRET ใน Script Properties' });
-  }
-  if (!code || !redirectUri) {
-    return respond({ success: false, message: 'ข้อมูลไม่ครบสำหรับยืนยันตัวตน' });
+  const cache   = CacheService.getScriptCache();
+  const failKey = 'loginfail_' + md5Hex_(username.toLowerCase());
+  const fails   = parseInt(cache.get(failKey) || '0', 10);
+  if (fails >= LOGIN_MAX_FAILS) {
+    writeLoginLog_(username, '', 'ถูกล็อก (ลองผิดเกินกำหนด)');
+    return { success: false, locked: true,
+             message: 'ลองผิดหลายครั้งเกินไป กรุณารอ 10 นาทีแล้วลองใหม่' };
   }
 
-  // ── 1) แลก authorization code เป็น access token ──
-  var tokenRes;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGIN_SHEET);
+  if (!sheet) {
+    return { success: false, message: 'ไม่พบชีต "' + LOGIN_SHEET + '" ในระบบ กรุณาติดต่อแอดมิน' };
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const head   = (values[0] || []).map(function (h) { return String(h).trim().toLowerCase(); });
+  const iU = head.indexOf('username'), iP = head.indexOf('password'), iN = head.indexOf('name');
+  if (iU < 0 || iP < 0 || iN < 0) {
+    return { success: false, message: 'ชีต "' + LOGIN_SHEET + '" ต้องมีหัวตาราง username, password, name' };
+  }
+
+  const uLower = username.toLowerCase();
+  let found = null;
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (String(row[iU]).trim().toLowerCase() !== uLower) continue;
+    if (safeEqual_(String(row[iP]).trim(), password)) { found = row; break; }
+  }
+
+  if (!found) {
+    cache.put(failKey, String(fails + 1), LOGIN_LOCK_SEC);
+    writeLoginLog_(username, '', 'ล้มเหลว');
+    Utilities.sleep(400);   // หน่วงเล็กน้อย ให้การเดารหัสช้าลง
+    return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
+  }
+
+  cache.remove(failKey);
+  const name = String(found[iN] || '').trim() || username;
+  writeLoginLog_(username, name, 'สำเร็จ');
+  return { success: true, name: name, username: username };
+}
+
+// เทียบสตริงแบบใช้เวลาเท่ากันไม่ว่าจะผิดตัวไหน
+function safeEqual_(a, b) {
+  a = String(a); b = String(b);
+  let diff = a.length ^ b.length;
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+function md5Hex_(str) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, str, Utilities.Charset.UTF_8)
+    .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+function writeLoginLog_(username, name, result) {
   try {
-    tokenRes = UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/token', {
-      method: 'post',
-      contentType: 'application/x-www-form-urlencoded',
-      payload: {
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: redirectUri,
-        client_id: channelId,
-        client_secret: channelSecret
-      },
-      muteHttpExceptions: true
-    });
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let log = ss.getSheetByName(LOGIN_LOG_SHEET);
+    if (!log) {
+      log = ss.insertSheet(LOGIN_LOG_SHEET);
+      log.appendRow(['วันที่', 'เวลา', 'username', 'ชื่อ', 'ผลลัพธ์']);
+    }
+    const now = new Date(), tz = Session.getScriptTimeZone();
+    log.appendRow([
+      Utilities.formatDate(now, tz, 'dd/MM/yyyy'),
+      Utilities.formatDate(now, tz, 'HH:mm:ss'),
+      username, name, result
+    ]);
   } catch (err) {
-    return respond({ success: false, message: 'เชื่อมต่อ LINE ไม่สำเร็จ: ' + err.message });
+    // เขียน log ไม่ได้ ไม่ควรทำให้ล็อกอินล้ม
   }
-
-  var tokenData = JSON.parse(tokenRes.getContentText());
-  if (!tokenData.access_token) {
-    return respond({ success: false, message: 'ยืนยันตัวตนกับ LINE ไม่สำเร็จ (' + (tokenData.error_description || tokenData.error || 'unknown') + ')' });
-  }
-
-  // ── 2) ดึงโปรไฟล์ผู้ใช้จาก LINE ──
-  var profileRes = UrlFetchApp.fetch('https://api.line.me/v2/profile', {
-    headers: { Authorization: 'Bearer ' + tokenData.access_token },
-    muteHttpExceptions: true
-  });
-  var profile = JSON.parse(profileRes.getContentText());
-  if (!profile.userId) {
-    return respond({ success: false, message: 'ไม่สามารถดึงข้อมูลโปรไฟล์ LINE ได้' });
-  }
-
-  // ยืนยันตัวตนสำเร็จ — ส่งข้อมูลโปรไฟล์กลับไปให้ frontend เพื่อไปขั้นตอนที่ 2 (กรอกรหัสหน่วย) ต่อ
-  return respond({
-    success: true,
-    lineUserId: profile.userId,
-    lineName: profile.displayName || '',
-    linePicture: profile.pictureUrl || ''
-  });
 }
 
 // =============================================================
@@ -191,16 +157,16 @@ function handleLineLogin(e) {
 //  แผนกแทบไม่เปลี่ยนบ่อย จึงแคชผลลัพธ์ไว้ 30 นาที
 //  ทำให้ครั้งถัดๆ ไปไม่ต้องเปิด/อ่านชีตใหม่ทุกครั้ง (เร็วขึ้นมาก)
 // =============================================================
-const DEPTS_CACHE_KEY = 'depts_v1';
-const DEPTS_CACHE_TTL = 1800; // 30 นาที (สูงสุดที่ CacheService รองรับคือ 21600 วิ = 6 ชม.)
+const DEPTS_CACHE_KEY = 'depts_v2';
+const DEPTS_CACHE_TTL = 1800; // 30 นาที (ล้างทันทีเมื่อ saveDepts หรือแก้ชีต Departments ด้วยมือ)
 
 function getDepts() {
   const cache = CacheService.getScriptCache();
-  try {
-    const cached = cache.get(DEPTS_CACHE_KEY);
-    if (cached) return JSON.parse(cached);
-  } catch (err) {
-    // ถ้า cache อ่านผิดพลาด ให้ไปอ่านชีตตามปกติ ไม่ throw
+  const hit = readChunked_(cache, DEPTS_CACHE_KEY);
+  if (hit) {
+    const out = {};
+    hit.forEach(function (pair) { out[pair[0]] = pair[1]; });
+    return out;
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -228,12 +194,18 @@ function getDepts() {
     }
   }
 
+  // สร้าง Collator ครั้งเดียวแล้วใช้ซ้ำ — localeCompare(…, 'th') ในลูป sort สร้างตัวเทียบใหม่ทุกคู่ ช้ามากเมื่อรายชื่อเยอะ
+  let cmp = function (a, b) { return a < b ? -1 : a > b ? 1 : 0; };
+  try { cmp = new Intl.Collator('th').compare; } catch (err) {}
+
   Object.keys(result).forEach(k => {
     result[k] = [...new Set(result[k])];
-    try { result[k].sort((a, b) => a.localeCompare(b, 'th')); } catch (err) {}
+    result[k].sort(cmp);
   });
 
-  try { cache.put(DEPTS_CACHE_KEY, JSON.stringify(result), DEPTS_CACHE_TTL); } catch (err) {}
+  writeChunked_(cache, DEPTS_CACHE_KEY,
+    Object.keys(result).map(function (k) { return [k, result[k]]; }),
+    DEPTS_CACHE_TTL);
 
   return result;
 }
@@ -251,7 +223,7 @@ function saveDepts(depts) {
     row++;
   }
   // แผนกเปลี่ยนแล้ว → ล้าง cache ทันที ไม่งั้นจะเห็นข้อมูลเก่าไปอีก 30 นาที
-  try { CacheService.getScriptCache().remove(DEPTS_CACHE_KEY); } catch (err) {}
+  invalidateDeptsCache_();
   return { success: true, message: 'บันทึกแผนกแล้ว' };
 }
 
@@ -411,34 +383,217 @@ function deleteLeave(data) {
   return { success: false, message: 'ไม่พบรายการที่ต้องการลบ' };
 }
 
-function getLeaves() {
-  const sheet = ensureLeavesSheet();
-  const data  = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+// =============================================================
+//  getLeaves — กรองฝั่งเซิร์ฟเวอร์ + cache (CacheService)
+//
+//  พารามิเตอร์ (ทั้งหมดไม่บังคับ — ถ้าไม่ส่งอะไรเลยจะได้ทุกแถวเหมือนเดิม
+//  หน้าอื่นๆ ที่เรียก ?action=getLeaves เฉยๆ จึงไม่กระทบ):
+//    dept    = ชื่อแผนก ('ALL' หรือว่าง = ทุกแผนก)
+//    year    = ปี ค.ศ. 4 หลัก (ว่าง = ทุกปี)
+//    month   = '01'..'12' (ว่าง = ทุกเดือน)
+//    compact = '1' → ส่งเป็นอาร์เรย์ [name,dept,leaveType,dateFrom,dateTo]
+//              (เล็กกว่าออบเจกต์ราวครึ่งหนึ่ง และตัด remark/createdAt ทิ้ง)
+//    nocache = '1' → ข้าม cache แล้วอ่านชีตใหม่ (ใช้กับปุ่มรีเฟรช)
+//
+//  Cache: เก็บทั้งชีตแบบย่อไว้ใน CacheService แบ่งเป็นก้อน ก้อนละ ≤ ~30,000 ตัวอักษร
+//  (ขีดจำกัดต่อ key = 100KB และภาษาไทย 1 ตัว = 3 ไบต์) แบ่งตาม "แถว" ไม่ตัดกลางสตริง
+//  ล้าง cache ทุกครั้งที่ saveLeave/deleteLeave และเมื่อแก้ชีต Leaves ด้วยมือ (onEdit)
+// =============================================================
+const LEAVES_CACHE_KEY   = 'leaves_v2';
+const LEAVES_CACHE_TTL   = 900;    // 15 นาที — กันกรณีแก้ชีตด้วยวิธีที่ onEdit จับไม่ได้
+const LEAVES_CHUNK_CHARS = 30000;
 
-  const tz     = Session.getScriptTimeZone();
-  const result = [];
+function getLeaves(p) {
+  p = p || {};
+  if (String(p.nocache) === '1') invalidateLeavesCache_();
 
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    let createdAt = '';
-    if (row[6] instanceof Date) {
-      createdAt = Utilities.formatDate(row[6], tz, 'dd/MM/yyyy HH:mm:ss');
-    } else {
-      createdAt = String(row[6] || '');
-    }
-    result.push({
-      name:      String(row[0] || ''),
-      dept:      String(row[1] || ''),
-      leaveType: String(row[2] || ''),
-      dateFrom:  normDate(row[3]),
-      dateTo:    normDate(row[4]),
-      remark:    String(row[5] || ''),
-      createdAt: createdAt
+  let rows = getLeavesRows_();
+
+  const dept  = String(p.dept  || '').trim();
+  const year  = String(p.year  || '').trim();
+  let   month = String(p.month || '').trim();
+  if (month) month = ('0' + month).slice(-2);
+  const filterDept = dept && dept !== 'ALL';
+
+  if (filterDept || year || month) {
+    rows = rows.filter(function (r) {
+      if (filterDept && r[1] !== dept) return false;
+      return leaveOverlaps_(r[3], r[4], year, month);
     });
   }
-  return result;
+
+  if (String(p.compact) === '1') {
+    return rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4]]; });
+  }
+  return rows.map(function (r) {
+    return { name: r[0], dept: r[1], leaveType: r[2], dateFrom: r[3], dateTo: r[4], remark: r[5], createdAt: r[6] };
+  });
+}
+
+// รายการ [from,to] ซ้อนทับกับ (ปี/เดือน) ที่เลือกหรือไม่ — logic เดียวกับ applyFilters ฝั่งหน้าเว็บ
+function leaveOverlaps_(from, to, year, month) {
+  if (!year && !month) return true;
+  if (!from) return false;
+  to = to || from;
+
+  if (year) {
+    let rs, re;
+    if (month) {
+      const last = new Date(+year, +month, 0).getDate();
+      rs = year + '-' + month + '-01';
+      re = year + '-' + month + '-' + ('0' + last).slice(-2);
+    } else {
+      rs = year + '-01-01';
+      re = year + '-12-31';
+    }
+    return !(from > re || to < rs);
+  }
+
+  // เลือกเดือนอย่างเดียว (ทุกปี): ตรวจทุกปีที่รายการครอบคลุม
+  const y1 = +from.slice(0, 4), y2 = +to.slice(0, 4);
+  if (y2 - y1 >= 2) return true; // ครอบคลุมเกิน 1 ปี → ต้องคาบเกี่ยวทุกเดือนแน่นอน
+  for (let y = y1; y <= y2; y++) {
+    const last = new Date(y, +month, 0).getDate();
+    const rs = y + '-' + month + '-01';
+    const re = y + '-' + month + '-' + ('0' + last).slice(-2);
+    if (!(from > re || to < rs)) return true;
+  }
+  return false;
+}
+
+// อ่านชีตจริง → แถวแบบย่อ [name,dept,leaveType,dateFrom,dateTo,remark,createdAt]
+function readLeavesRows_() {
+  const sheet = ensureLeavesSheet();
+  const last  = sheet.getLastRow();
+  if (last <= 1) return [];
+
+  const data = sheet.getRange(2, 1, last - 1, 7).getValues(); // เฉพาะ 7 คอลัมน์ ไม่ใช้ getDataRange
+  const tz   = Session.getScriptTimeZone();
+  const rows = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+    const createdAt = (row[6] instanceof Date)
+      ? Utilities.formatDate(row[6], tz, 'dd/MM/yyyy HH:mm:ss')
+      : String(row[6] || '');
+    rows.push([
+      String(row[0] || ''),
+      String(row[1] || ''),
+      String(row[2] || ''),
+      normDate(row[3]),
+      normDate(row[4]),
+      String(row[5] || ''),
+      createdAt
+    ]);
+  }
+  return rows;
+}
+
+function getLeavesRows_() {
+  const cache = CacheService.getScriptCache();
+  const hit = readLeavesCache_(cache);
+  if (hit) return hit;
+
+  // cache miss → อ่านชีตภายใต้ lock เพื่อไม่ให้เขียน cache ทับข้อมูลที่เพิ่งถูกแก้
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try { lock.waitLock(10000); locked = true; } catch (err) {}
+
+  try {
+    if (locked) {
+      const again = readLeavesCache_(cache);   // คนอื่นอาจเติม cache ระหว่างรอ lock
+      if (again) return again;
+    }
+    const rows = readLeavesRows_();
+    if (locked) writeLeavesCache_(cache, rows);
+    return rows;
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function readLeavesCache_(cache)        { return readChunked_(cache, LEAVES_CACHE_KEY); }
+function writeLeavesCache_(cache, rows) { writeChunked_(cache, LEAVES_CACHE_KEY, rows, LEAVES_CACHE_TTL); }
+
+// ── cache แบบแบ่งก้อนใช้ร่วมกัน (leaves / depts) ──
+// rows = อาร์เรย์ของ "แถว" แต่ละก้อนเก็บหลายแถว ก้อนละ ≤ LEAVES_CHUNK_CHARS ตัวอักษร
+// (CacheService จำกัด 100KB ต่อ key และภาษาไทย 1 ตัว = 3 ไบต์ — ถ้าเก็บก้อนเดียวใหญ่เกิน put() จะ throw
+//  แล้วโค้ดเดิมกลืน error ทิ้ง ผลคือ "ไม่มี cache เลย" ทุกครั้งต้องอ่านชีตใหม่)
+function readChunked_(cache, key) {
+  try {
+    const meta = cache.get(key + '_n');
+    if (!meta) return null;
+    const n = parseInt(meta, 10);
+    const keys = [];
+    for (let i = 0; i < n; i++) keys.push(key + '_' + i);
+    const got = cache.getAll(keys);
+    let rows = [];
+    for (let i = 0; i < n; i++) {
+      const part = got[keys[i]];
+      if (part == null) return null;           // ก้อนใดก้อนหนึ่งหาย/หมดอายุ → ถือว่า miss
+      rows = rows.concat(JSON.parse(part));
+    }
+    return rows;
+  } catch (err) {
+    return null;
+  }
+}
+
+function writeChunked_(cache, key, rows, ttl) {
+  try {
+    const chunks = [];
+    let cur = [], size = 2;
+    rows.forEach(function (r) {
+      const s = JSON.stringify(r).length + 1;
+      if (cur.length && size + s > LEAVES_CHUNK_CHARS) { chunks.push(cur); cur = []; size = 2; }
+      cur.push(r);
+      size += s;
+    });
+    if (cur.length || !chunks.length) chunks.push(cur);
+
+    const obj = {};
+    chunks.forEach(function (c, i) { obj[key + '_' + i] = JSON.stringify(c); });
+    obj[key + '_n'] = String(chunks.length);
+    cache.putAll(obj, ttl);
+  } catch (err) {
+    // เขียน cache ไม่สำเร็จ ไม่เป็นไร รอบหน้าอ่านชีตตามปกติ
+  }
+}
+
+// ลบแค่ key "_n" ก็พอ — ไม่มี _n = miss ก้อนที่เหลือจะหมดอายุเอง
+function invalidateLeavesCache_() {
+  try { CacheService.getScriptCache().remove(LEAVES_CACHE_KEY + '_n'); } catch (err) {}
+}
+
+// ครอบ save/delete: ล็อกกันชนกับการเติม cache แล้วล้าง cache หลังเขียนชีตเสร็จ
+function withLeavesLock_(fn) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (err) {
+    return { success: false, message: 'ระบบกำลังประมวลผลคำขออื่นอยู่ กรุณาลองใหม่อีกครั้ง' };
+  }
+  try {
+    const result = fn();
+    invalidateLeavesCache_();
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// แก้ชีต Leaves ด้วยมือ → ล้าง cache ทันที (simple trigger, ไม่ต้องตั้งค่าอะไรเพิ่ม)
+function onEdit(e) {
+  try {
+    const name = e && e.range ? e.range.getSheet().getName() : '';
+    if (name === 'Leaves')           invalidateLeavesCache_();
+    else if (name === 'Departments') invalidateDeptsCache_();
+  } catch (err) {}
+}
+
+function invalidateDeptsCache_() {
+  try { CacheService.getScriptCache().remove(DEPTS_CACHE_KEY + '_n'); } catch (err) {}
 }
 
 function getStatusData() {

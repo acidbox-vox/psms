@@ -4,12 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>บันทึกการจำหน่าย</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet"></noscript>
 <script src="js/api-config.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/cache.js"></script>
 <script src="js/loader.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>(function(){if(!sessionStorage.getItem("loggedIn")){window.location.replace("login.html");}})()</script>
 <style>
 :root {
@@ -547,18 +551,39 @@ function highlightMatch(text, q) {
 }
 (function(){ const t = new Date().toISOString().split('T')[0]; document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();
 window.onload = async function(){ await initLoad(); };
-// promise ของข้อมูลการลา — ใช้รอตอนจะเช็ควันซ้ำ/บันทึก โดยไม่บล็อกการโหลดแผนก
-let leavesLoadPromise = null;
+// ประวัติการลาใช้เช็ควันซ้ำฝั่งหน้าจอเท่านั้น (เซิร์ฟเวอร์ตรวจซ้ำตอนบันทึกอีกชั้น)
+// จึงโหลดเฉพาะแผนกที่ผู้ใช้เลือก แทนการดึงทั้งชีตหมื่นแถวตั้งแต่เปิดหน้า
+let leavesByDept = {};              // แผนก → รายการลาของแผนกนั้น (รวมที่เพิ่งบันทึกในหน้านี้)
+const deptReq = {};                 // คำขอที่กำลังบินอยู่ (กันยิงซ้ำ)
+let leavesLoadPromise = Promise.resolve();
+function rebuildAllLeaves() { allLeaves = [].concat(...Object.values(leavesByDept)); }
+function addLeaveLocal(item) { if (leavesByDept[item.dept]) leavesByDept[item.dept].push(item); allLeaves.push(item); }
+async function fetchDeptLeaves(d) {
+  const raw = await (await fetch(API+'?action=getLeaves&compact=1&dept='+encodeURIComponent(d))).json() || [];
+  return raw.map(a=>Array.isArray(a)?{name:a[0],dept:a[1],leaveType:a[2],dateFrom:a[3],dateTo:a[4]}:a);
+}
+// คืน promise ที่เสร็จเมื่อประวัติของทุกแผนกที่ขอ (และที่ขอค้างไว้ก่อนหน้า) พร้อมแล้ว
+function loadDeptLeaves(depts) {
+  const waits = [];
+  [...new Set(depts)].filter(Boolean).forEach(d => {
+    if (Object.prototype.hasOwnProperty.call(leavesByDept, d)) return;
+    if (!deptReq[d]) {
+      deptReq[d] = (window.DataCache ? DataCache.getLeavesFiltered({dept:d}) : fetchDeptLeaves(d))
+        .then(rows => { leavesByDept[d] = rows || []; rebuildAllLeaves(); })
+        .catch(e => { showToast('❌ โหลดประวัติการลาของแผนก '+d+' ไม่ได้: '+e.message,'error'); })
+        .then(() => { delete deptReq[d]; });
+    }
+    waits.push(deptReq[d]);
+  });
+  if (waits.length) leavesLoadPromise = Promise.all([leavesLoadPromise, ...waits]).then(() => {});
+  return leavesLoadPromise;
+}
 async function initLoad() {
   if (!API) { showToast('❌ ยังไม่ตั้งค่า API URL', 'error'); if(window.Loader)Loader.hide(); return; }
   const input = document.getElementById('f-dept-input');
 
-  // ยิงคำขอ getDepts + getLeaves พร้อมกัน แต่ "ไม่รอ" ให้ทั้งคู่เสร็จก่อนแสดงแผนก
-  const deptPromise  = window.DataCache ? DataCache.getDepts()  : fetch(API+'?action=getDepts').then(r=>r.json());
-  leavesLoadPromise   = window.DataCache ? DataCache.getLeaves() : fetch(API+'?action=getLeaves').then(r=>r.json());
-  leavesLoadPromise = leavesLoadPromise
-    .then(data => { allLeaves = data || []; return allLeaves; })
-    .catch(e => { allLeaves = []; showToast('❌ โหลดประวัติการลาไม่ได้: '+e.message,'error'); return allLeaves; });
+  // โหลดแผนก (+รายชื่อ) — ประวัติการลาจะโหลดทีหลังเมื่อผู้ใช้เลือกแผนก
+  const deptPromise = window.DataCache ? DataCache.getDepts() : fetch(API+'?action=getDepts').then(r=>r.json());
 
   // แสดงช่องค้นหาแผนกทันทีที่โหลดเสร็จ ไม่ต้องรอข้อมูลการลาทั้งหมด (สาเหตุที่ทำให้หน้าช้า)
   try {
@@ -574,6 +599,7 @@ async function initLoad() {
 }
 function setMode(mode) {
   currentMode = mode;
+  if (mode==='import' && window.loadXLSX) loadXLSX().catch(function(){}); // เตรียมไลบรารี Excel ไว้ก่อนเลือกไฟล์
   document.getElementById('mode-single').className = 'mode-btn'+(mode==='single'?' active':'');
   document.getElementById('mode-multi').className  = 'mode-btn'+(mode==='multi'?' active':'');
   document.getElementById('mode-import').className = 'mode-btn'+(mode==='import'?' active':'');
@@ -694,6 +720,7 @@ function onComboKeydown(e, kind) {
 }
 function onDeptChange() {
   const dept = document.getElementById('f-dept').value; selectedNames = [];
+  if (dept) loadDeptLeaves([dept]);   // เริ่มโหลดประวัติของแผนกนี้ระหว่างที่ผู้ใช้เลือกชื่อ/วันที่
   if (currentMode==='single') {
     const inputEl = document.getElementById('f-name-input');
     document.getElementById('f-name').value=''; inputEl.value='';
@@ -816,7 +843,7 @@ function updatePreviewBasic() {
 }
 async function doSave() { if (currentMode==='single') await doSaveSingle(); else await doSaveMulti(); }
 async function doSaveSingle() {
-  if (leavesLoadPromise) await leavesLoadPromise;
+  await loadDeptLeaves([document.getElementById('f-dept').value]);
   const name=document.getElementById('f-name').value, dept=document.getElementById('f-dept').value, type=typeToSave(), from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
   const conflicts=findConflicts(name,from,to,type);
   if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n'); document.getElementById('modal-msg').innerText=`${name} มีรายการที่วันที่ซ้ำกันอยู่แล้ว:\n${detail}`; document.getElementById('modal').classList.add('show'); return; }
@@ -825,13 +852,13 @@ async function doSaveSingle() {
     const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'saveLeave',dept,name,leaveType:type,dateFrom:from,dateTo:to})});
     const data=await r.json();
     if (data.duplicate) { document.getElementById('modal-msg').innerText=data.message; document.getElementById('modal').classList.add('show'); }
-    else if (data.success) { allLeaves.push({name,dept,leaveType:type,dateFrom:from,dateTo:to}); if(window.DataCache)DataCache.invalidate(); showToast('✅ บันทึกสำเร็จ','success'); resetForm(true); }
+    else if (data.success) { addLeaveLocal({name,dept,leaveType:type,dateFrom:from,dateTo:to}); if(window.DataCache)DataCache.invalidate(); showToast('✅ บันทึกสำเร็จ','success'); resetForm(true); }
     else { showToast('❌ '+(data.message||'บันทึกไม่สำเร็จ'),'error'); }
   } catch(e) { showToast('❌ เชื่อมต่อไม่ได้: '+e.message,'error'); }
   btn.disabled=false; btn.innerHTML='💾 บันทึกข้อมูล';
 }
 async function doSaveMulti() {
-  if (leavesLoadPromise) await leavesLoadPromise;
+  await loadDeptLeaves([document.getElementById('f-dept').value]);
   const dept=document.getElementById('f-dept').value, type=typeToSave(), from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, names=[...selectedNames];
   const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML=`⏳ กำลังบันทึก 0/${names.length}...`;
   const prog=document.getElementById('multi-progress'); prog.innerHTML=`<b>กำลังบันทึก ${names.length} คน...</b><br>`; prog.className='show';
@@ -843,7 +870,7 @@ async function doSaveMulti() {
     try {
       const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'saveLeave',dept,name,leaveType:type,dateFrom:from,dateTo:to})});
       const data=await r.json();
-      if (data.success) { allLeaves.push({name,dept,leaveType:type,dateFrom:from,dateTo:to}); prog.innerHTML+=`<div class="prog-item ok">✅ ${esc(name)}</div>`; okCount++; }
+      if (data.success) { addLeaveLocal({name,dept,leaveType:type,dateFrom:from,dateTo:to}); prog.innerHTML+=`<div class="prog-item ok">✅ ${esc(name)}</div>`; okCount++; }
       else if (data.duplicate) { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(data.message||'ซ้ำ')}</div>`; }
       else { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(data.message||'ไม่สำเร็จ')}</div>`; }
     } catch(e) { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(e.message)}</div>`; }
@@ -901,6 +928,7 @@ function onImportFile(e) {
   const reader = new FileReader();
   reader.onload = async function(ev) {
     try {
+      await window.loadXLSX();
       const data = new Uint8Array(ev.target.result);
       const wb = XLSX.read(data, {type:'array'}); // ไม่ใช้ cellDates:true เพราะทำให้เกิดปัญหาปัดเศษวันที่คลาดเคลื่อนในบางโซนเวลา (ดู excelDateToYMD)
       const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -932,6 +960,7 @@ async function parseAndValidateRows(rows) {
     parsed.push({rownum:i+1, dept, name, type, from, to, status:'', msg:''});
   }
   if (!parsed.length) { clearLoading(); showToast('⚠️ ไม่พบข้อมูลในไฟล์', 'error'); return; }
+  await loadDeptLeaves(parsed.map(r=>r.dept).filter(d=>deptMap.hasOwnProperty(d)));
   importRows = parsed;
   validateImportRows();
   renderImportTable();
@@ -989,7 +1018,7 @@ async function doSaveImport() {
       const r = await fetch(API, {method:'POST', body:JSON.stringify({action:'saveLeave', dept:row.dept, name:row.name, leaveType:row.type, dateFrom:row.from, dateTo:row.to})});
       const data = await r.json();
       if (data.success) {
-        allLeaves.push({name:row.name, dept:row.dept, leaveType:row.type, dateFrom:row.from, dateTo:row.to});
+        addLeaveLocal({name:row.name, dept:row.dept, leaveType:row.type, dateFrom:row.from, dateTo:row.to});
         importRows[row.idx].status='saved';
         if (rowEl) { rowEl.className='imp-row-saved'; rowEl.lastElementChild.innerHTML='<span class="imp-badge saved">💾 บันทึกแล้ว</span>'; }
         prog.innerHTML += `<div class="prog-item ok">✅ ${esc(row.name)}</div>`;
