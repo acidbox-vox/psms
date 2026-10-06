@@ -392,7 +392,7 @@ function showToast(msg,type) { const t=document.getElementById('toast'); t.inner
 function buildYearOptions(data, selected) {
   const sel = document.getElementById('f-year');
   const cur = new Date().getFullYear();
-  const years = new Set([cur-2, cur-1, cur, cur+1]);
+  const years = new Set([cur-5, cur-4, cur-3, cur-2, cur-1, cur, cur+1]);
   (data||[]).forEach(r => {
     [r.dateFrom, r.dateTo].forEach(d => {
       const y = parseInt(String(d||'').slice(0,4),10);
@@ -436,30 +436,71 @@ function showPrompt() {
   document.getElementById('t-count').innerText = '';
 }
 
+// ── โหลดข้อมูล: ให้เซิร์ฟเวอร์กรองตามแผนก/ปี/เดือน แล้วรับมาเฉพาะที่ต้องใช้ ──
+let loadedKey = null;      // คิวรีล่าสุดที่โหลดสำเร็จ (dept|year|month)
+let reqSeq = 0;            // กันคำตอบเก่าที่มาช้ากว่าไปทับคำตอบใหม่
+let idxMap = new Map();    // แถว → ลำดับใน allData (แทน allData.indexOf ที่ช้า)
+let viewRows = [];         // แถวที่ผ่านตัวกรองแล้ว เรียงใหม่ → เก่า
+let shown = 0;
+const PAGE_SIZE = 100;
+
+function currentQuery() {
+  const dept = document.getElementById('f-dept').value;
+  return {
+    dept:  dept === 'ALL' ? '' : dept,
+    year:  document.getElementById('f-year').value,
+    month: document.getElementById('f-month').value
+  };
+}
+function queryKey() {
+  const q = currentQuery();
+  return [document.getElementById('f-dept').value, q.year, q.month].join('|');
+}
+function rebuildIndex() { idxMap = new Map(allData.map((r,i) => [r,i])); }
+
+// สำรองกรณีไม่มี DataCache
+async function fetchLeavesDirect(q, force) {
+  const p = new URLSearchParams({ action:'getLeaves', compact:'1' });
+  if (q.dept)  p.set('dept',  q.dept);
+  if (q.year)  p.set('year',  q.year);
+  if (q.month) p.set('month', q.month);
+  if (force)   p.set('nocache','1');
+  const raw = await (await fetch(API+'?'+p.toString())).json() || [];
+  return raw.map(a => Array.isArray(a) ? {name:a[0],dept:a[1],leaveType:a[2],dateFrom:a[3],dateTo:a[4]} : a);
+}
+
 async function loadData(force) {
   if (!API) { document.getElementById('tbody').innerHTML='<div class="empty-state"><div class="ei">⚙️</div><p>ยังไม่ตั้งค่า API URL</p></div>'; return; }
+  const key = queryKey(), q = currentQuery(), seq = ++reqSeq;
   document.getElementById('tbody').innerHTML='<div class="loading-row"><span class="spinner"></span> กำลังโหลดข้อมูล...</div>';
   // เริ่ม fetch ก่อน แล้วค่อย show loader — ไม่บล็อก network request
-  var dataPromise = window.DataCache ? DataCache.getLeaves(force) : fetch(API+'?action=getLeaves').then(r=>r.json()).then(d=>d||[]);
+  var dataPromise = window.DataCache ? DataCache.getLeavesFiltered(q, force) : fetchLeavesDirect(q, force);
   if(window.Loader) Loader.show();
   try {
-    allData = await dataPromise;
+    const rows = await dataPromise;
+    if (seq !== reqSeq) return;            // มีคำขอที่ใหม่กว่าแล้ว — ทิ้งผลนี้
+    allData = rows;
     dataLoaded = true;
+    loadedKey = key;
+    rebuildIndex();
     buildYearOptions(allData);
-    // sync dept dropdown ถ้าข้อมูลมาจาก getLeaves
+    // sync dept dropdown (เติมแผนกที่มีในข้อมูลแต่ยังไม่อยู่ในรายการ)
     const depts = [...new Set(allData.map(r=>r.dept).filter(Boolean))].sort();
     const sel = document.getElementById('f-dept'); const cur = sel.value;
     const existing = [...sel.options].map(o=>o.value).filter(v=>v&&v!=='ALL');
     if (depts.some(d=>!existing.includes(d))) {
+      const all = [...new Set([...existing, ...depts])].sort();
       sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
-      depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
+      all.forEach(d => sel.innerHTML += `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`);
       if (cur) sel.value = cur;
     }
-    applyFilters();
+    renderRows();
     if(window.Loader) Loader.hide();
   } catch(e) {
+    if (seq !== reqSeq) return;
+    loadedKey = null;
     if(window.Loader) Loader.hide();
-    document.getElementById('tbody').innerHTML=`<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${e.message}</small></p></div>`;
+    document.getElementById('tbody').innerHTML=`<div class="empty-state"><div class="ei">❌</div><p>โหลดข้อมูลไม่ได้<br><small style="color:#999">${esc(e.message)}</small></p></div>`;
     showToast('❌ โหลดข้อมูลไม่ได้','error');
   }
 }
@@ -468,33 +509,31 @@ function onFilterChange() {
   if (dataLoaded) applyFilters();
 }
 
+// จุดเข้าเดียวของปุ่ม "แสดง" / ช่องค้นหา / เปลี่ยนตัวกรอง
+// ถ้า แผนก/ปี/เดือน เปลี่ยนจากที่โหลดไว้ → ไปเอาจากเซิร์ฟเวอร์ใหม่ (โดน cache ก็เร็ว)
+// ถ้าเปลี่ยนแค่ช่องค้นหาชื่อ → กรองในหน่วยความจำทันที
 function applyFilters() {
+  if (!document.getElementById('f-dept').value) { showPrompt(); return; }
+  if (!dataLoaded || queryKey() !== loadedKey) { loadData(false); return; }
+  renderRows();
+}
+
+function renderRows() {
   const dept   = document.getElementById('f-dept').value;
   const month  = document.getElementById('f-month').value;
   const year   = document.getElementById('f-year').value;
   const search = (document.getElementById('f-search').value || '').trim().toLowerCase();
-
-  // ต้องเลือกแผนกก่อนเสมอ
-  if (!dept) {
-    showPrompt();
-    return;
-  }
-
-  // ถ้ายังไม่ได้โหลดข้อมูลเลย ให้โหลดก่อน (จะ call applyFilters อีกครั้งหลังโหลดเสร็จ)
-  if (!dataLoaded) {
-    loadData(false);
-    return;
-  }
+  if (!dept) { showPrompt(); return; }
 
   const deptFilter = dept === 'ALL' ? '' : dept;
 
-  let rows = allData.filter(r => {
+  // กรองซ้ำฝั่งหน้าเว็บด้วย (ข้อมูลน้อยแล้ว ราคาถูก) — กันกรณี GAS ยังเป็นเวอร์ชันเก่าที่ส่งมาทั้งหมด
+  const rows = allData.filter(r => {
     if (deptFilter && r.dept !== deptFilter) return false;
     if (month || year) {
       const from = (r.dateFrom || '').slice(0,10), to = (r.dateTo || r.dateFrom || '').slice(0,10);
       if (!from) return false;
       if (year) {
-        // กรองตามปีที่เลือก: รายการต้องคาบเกี่ยวกับช่วง (เดือนนั้นของปีนั้น / ทั้งปี)
         let rs, re;
         if (month) {
           const last = new Date(+year, +month, 0).getDate();
@@ -502,14 +541,14 @@ function applyFilters() {
         } else { rs = `${year}-01-01`; re = `${year}-12-31`; }
         if (from > re || to < rs) return false;
       } else {
-        // ทุกปี + เลือกเดือน: ตรวจทุกปีที่รายการครอบคลุม
         const y1 = +from.slice(0,4), y2 = +to.slice(0,4);
         let found = false;
-        for (let y = y1; y <= y2; y++) {
+        for (let y = y1; y <= Math.min(y2, y1 + 1); y++) {
           const last = new Date(y, +month, 0).getDate();
           const rs = `${y}-${month}-01`, re = `${y}-${month}-${String(last).padStart(2,'0')}`;
           if (!(from > re || to < rs)) { found = true; break; }
         }
+        if (!found && y2 - y1 >= 2) found = true;
         if (!found) return false;
       }
     }
@@ -519,24 +558,35 @@ function applyFilters() {
     return true;
   });
 
-  let indexed = rows.map((r,_) => ({r, idx: allData.indexOf(r)}));
-  indexed.sort((a,b) => b.idx - a.idx);
+  // ใหม่ → เก่า (filter คงลำดับเดิมของชีต จึงแค่กลับด้าน)
+  viewRows = rows.reverse();
 
-  TYPES.forEach(t => { document.getElementById('s-'+slug(t)).innerText = rows.filter(r=>baseType(r.leaveType)===t).length; });
-  document.getElementById('t-count').innerText = rows.length + ' รายการ';
+  TYPES.forEach(t => { document.getElementById('s-'+slug(t)).innerText = viewRows.filter(r=>baseType(r.leaveType)===t).length; });
+  document.getElementById('t-count').innerText = viewRows.length.toLocaleString() + ' รายการ';
 
-  if (rows.length === 0) {
+  if (viewRows.length === 0) {
     document.getElementById('tbody').innerHTML = '<div class="empty-state"><div class="ei">📭</div><p>ไม่พบข้อมูลที่ตรงกัน</p></div>';
     return;
   }
+  shown = Math.min(PAGE_SIZE, viewRows.length);
+  drawTable();
+}
+
+// วาดตารางเฉพาะ `shown` แถวแรก (ทีละ 100) — ไม่สร้าง DOM นับหมื่นแถวพร้อมกัน
+function drawTable() {
   let html = `<table><thead><tr><th>ชื่อ - นามสกุล</th><th>แผนก</th><th>ประเภท</th><th>วันที่ไป</th><th>วันที่กลับ</th><th>จำนวน</th><th></th></tr></thead><tbody>`;
-  indexed.forEach(({r,idx},pos) => {
+  for (let pos = 0; pos < shown; pos++) {
+    const r = viewRows[pos], idx = idxMap.get(r);
     const days=dayCount(r.dateFrom,r.dateTo), icon=TYPE_ICON[baseType(r.leaveType)]||'', badgeCls=`b-${slug(baseType(r.leaveType))}`, isNewest=pos===0;
     html+=`<tr id="row-${idx}"><td class="fw6">${esc(r.name)}${isNewest?'<span class="new-badge">ใหม่</span>':''}</td><td><span class="dept-tag">${esc(r.dept||'-')}</span></td><td><span class="badge ${badgeCls}">${icon} ${esc(fmtType(r.leaveType))}</span></td><td class="nowrap">${thDate(r.dateFrom)}</td><td class="nowrap">${thDate(r.dateTo)}</td><td><span class="days-pill">${days} วัน</span></td><td><button class="del-btn" onclick="confirmDelete(${idx})">🗑️</button></td></tr>`;
-  });
+  }
   html += '</tbody></table>';
+  if (shown < viewRows.length) {
+    html += `<div style="text-align:center;padding:14px"><button class="btn-sm" onclick="showMore()">⬇️ แสดงเพิ่ม (${shown.toLocaleString()} / ${viewRows.length.toLocaleString()})</button></div>`;
+  }
   document.getElementById('tbody').innerHTML = html;
 }
+function showMore() { shown = Math.min(shown + PAGE_SIZE, viewRows.length); drawTable(); }
 
 let pendingDeleteIdx = -1;
 function confirmDelete(idx) {
@@ -553,7 +603,7 @@ async function doDelete() {
   try {
     const res=await fetch(API,{method:'POST',body:JSON.stringify({action:'deleteLeave',name:r.name,dept:r.dept,leaveType:r.leaveType,dateFrom:r.dateFrom,dateTo:r.dateTo})});
     const data=await res.json();
-    if (data.success) { allData.splice(pendingDeleteIdx,1); closeDelModal(); applyFilters(); showToast('🗑️ ลบรายการเรียบร้อย','success'); if(window.DataCache)DataCache.invalidate(); }
+    if (data.success) { allData.splice(pendingDeleteIdx,1); rebuildIndex(); closeDelModal(); applyFilters(); showToast('🗑️ ลบรายการเรียบร้อย','success'); if(window.DataCache)DataCache.invalidate(); }
     else { showToast('❌ '+(data.message||'ลบไม่สำเร็จ'),'error'); }
   } catch(e) { showToast('❌ เชื่อมต่อไม่ได้: '+e.message,'error'); }
   document.getElementById('del-confirm-btn').disabled=false; document.getElementById('del-confirm-btn').innerText='🗑️ ยืนยันลบ';
