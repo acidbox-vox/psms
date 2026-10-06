@@ -89,39 +89,37 @@ body::after {
 .card-title span { font-size:1.2em; }
 .card-desc { font-size:0.82em; color:var(--text2); margin-bottom:24px; line-height:1.5; }
 
-/* OTP Boxes */
-.otp-wrap {
-  display:flex; gap:10px; justify-content:center; margin-bottom:24px;
+/* Form fields */
+.field { margin-bottom:16px; }
+.field label { display:block; font-size:0.78em; font-weight:700; color:var(--text2); margin-bottom:6px; }
+.input-wrap { position:relative; }
+.input-wrap input {
+  width:100%; padding:14px 16px; border-radius:14px;
+  border:2px solid var(--border); background:var(--bg);
+  font-family:'Sarabun',sans-serif; font-size:1em; color:var(--text);
+  outline:none; caret-color:var(--blue);
+  transition: border-color .2s, box-shadow .2s;
 }
-.otp-box {
-  width:54px; height:64px; border-radius:14px;
-  border:2px solid var(--border);
-  background:var(--bg);
-  font-size:1.8em; font-weight:800; color:var(--text);
-  text-align:center; outline:none;
-  caret-color: var(--blue);
-  transition: border-color .2s, box-shadow .2s, transform .15s;
-  -webkit-appearance:none;
+.input-wrap input:focus {
+  border-color:var(--blue); background:var(--surface);
+  box-shadow:0 0 0 3px rgba(59,124,244,0.15);
 }
-.otp-box:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(59,124,244,0.15);
-  background: var(--surface);
-  transform: scale(1.05);
-}
-.otp-box.filled {
-  border-color: rgba(59,124,244,0.4);
-  background: var(--surface);
-}
-.otp-box.error {
-  border-color: var(--red) !important;
-  box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important;
+.input-wrap input.error {
+  border-color:var(--red) !important;
+  box-shadow:0 0 0 3px rgba(239,68,68,0.15) !important;
   animation: shake .35s ease;
 }
-.otp-box.success {
-  border-color: var(--green) !important;
-  box-shadow: 0 0 0 3px rgba(16,185,129,0.15) !important;
+.input-wrap input.success {
+  border-color:var(--green) !important;
+  box-shadow:0 0 0 3px rgba(16,185,129,0.15) !important;
 }
+.input-wrap.has-eye input { padding-right:50px; }
+.eye-btn {
+  position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  background:none; border:none; cursor:pointer;
+  font-size:1.1em; padding:8px 10px; line-height:1; opacity:.7;
+}
+.eye-btn:hover { opacity:1; }
 @keyframes shake {
   0%,100%{transform:translateX(0)}
   20%{transform:translateX(-6px)}
@@ -210,54 +208,6 @@ html.dark {
   margin-top:24px; text-align:center; font-size:0.72em;
   color:var(--text3); position:relative; z-index:1;
 }
-
-/* LINE Login */
-.btn-line {
-  width:100%; padding:14px;
-  background:#06C755; color:#fff; border:none; border-radius:14px;
-  font-family:'Sarabun',sans-serif; font-size:1em; font-weight:700;
-  cursor:pointer; letter-spacing:.02em;
-  box-shadow: 0 4px 16px rgba(6,199,85,0.35);
-  transition: all .2s ease;
-  display:flex; align-items:center; justify-content:center; gap:10px;
-  margin-bottom:18px;
-}
-.btn-line:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(6,199,85,0.45); }
-.btn-line:active:not(:disabled) { transform: scale(.97); }
-.btn-line:disabled { opacity:.6; cursor:not-allowed; transform:none; }
-.btn-line svg { width:22px; height:22px; flex-shrink:0; }
-
-.divider { display:flex; align-items:center; gap:12px; margin-bottom:18px; color:var(--text3); font-size:0.78em; }
-.divider::before, .divider::after { content:''; flex:1; height:1px; background:var(--border); }
-
-.step-badge {
-  display:inline-flex; align-items:center; gap:6px;
-  background:var(--blue-light); color:var(--blue); border:1px solid rgba(59,124,244,0.2);
-  border-radius:20px; padding:4px 12px; font-size:0.72em; font-weight:800; letter-spacing:.03em;
-  margin-bottom:10px;
-}
-
-.line-profile {
-  display:flex; align-items:center; gap:12px;
-  background:var(--bg); border:1.5px solid var(--border); border-radius:14px;
-  padding:12px 14px; margin-bottom:18px;
-}
-.line-profile img { width:40px; height:40px; border-radius:50%; flex-shrink:0; background:var(--border); }
-.line-profile .lp-text { flex:1; font-size:0.85em; color:var(--text2); }
-.line-profile .lp-text b { color:var(--text); font-size:1.05em; }
-.link-btn {
-  background:none; border:none; color:var(--blue); font-size:0.78em; font-weight:700;
-  font-family:'Sarabun',sans-serif; cursor:pointer; text-decoration:underline; padding:0;
-  white-space:nowrap;
-}
-
-.pending-msg {
-  background: rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);
-  border-radius:12px; padding:14px 16px;
-  font-size:0.82em; color:#b45309; font-weight:600;
-  text-align:center; line-height:1.6; margin-bottom:16px; display:none;
-}
-.pending-msg.show { display:block; animation: fadeInUp .3s ease both; }
 </style>
 </head>
 <body>
@@ -275,47 +225,32 @@ html.dark {
   <div class="card">
     <div class="card-title"><span>🔐</span> เข้าสู่ระบบ</div>
 
-    <div class="pending-msg" id="pendingMsg"></div>
+    <p class="card-desc">กรุณากรอกชื่อผู้ใช้และรหัสผ่านของท่าน</p>
 
-    <!-- ── ขั้นตอนที่ 1: ยืนยันตัวตนด้วย LINE ── -->
-    <div id="step-line">
-      <div class="step-badge">ขั้นตอนที่ 1 / 2</div>
-      <p class="card-desc">ยืนยันตัวตนด้วยบัญชี LINE ของท่านก่อน</p>
-      <button class="btn-line" id="btnLine" onclick="loginWithLine()">
-        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 5.94 2 10.8c0 4.36 3.6 8.01 8.46 8.7.33.07.78.22.9.5.1.26.07.66.03.92l-.15.9c-.04.26-.2 1.02.89.56s5.9-3.47 8.05-5.94C21.6 14.05 22 12.5 22 10.8 22 5.94 17.52 2 12 2z"/></svg>
-        <span id="lineBtnText">เข้าสู่ระบบด้วย LINE</span>
-      </button>
-    </div>
-
-    <!-- แสดงหลังยืนยัน LINE สำเร็จ -->
-    <div class="line-profile" id="lineProfileBox" style="display:none">
-      <img id="lineAvatar" src="" alt="">
-      <div class="lp-text">ยืนยันตัวตนแล้ว<br><b id="lineNameLabel"></b></div>
-      <button class="link-btn" onclick="resetLineStep()">เปลี่ยนบัญชี</button>
-    </div>
-
-    <!-- ── ขั้นตอนที่ 2: กรอกรหัสหน่วย ── -->
-    <div id="step-pin" style="display:none">
-      <div class="step-badge">ขั้นตอนที่ 2 / 2</div>
-      <p class="card-desc">กรุณากรอกหมายเลขโทรศัพท์หน่วยของท่าน (หมายเลข 5 ตัว)</p>
-
-      <div class="otp-wrap" id="otpWrap">
-        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d0">
-        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d1">
-        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d2">
-        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d3">
-        <input class="otp-box" type="tel" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" id="d4">
+    <form id="loginForm" onsubmit="doLogin(event)" autocomplete="on" novalidate>
+      <div class="field">
+        <label for="username">ชื่อผู้ใช้ (Username)</label>
+        <div class="input-wrap">
+          <input type="text" id="username" name="username" autocomplete="username"
+                 autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="100">
+        </div>
       </div>
 
-      <div class="error-msg" id="errorMsg">
-        ⚠️ ท่านกรอกหมายเลขไม่ถูกต้อง<br>กรุณาติดต่อแอดมิน ผกพ.ฯ
+      <div class="field">
+        <label for="password">รหัสผ่าน (Password)</label>
+        <div class="input-wrap has-eye">
+          <input type="password" id="password" name="password" autocomplete="current-password" maxlength="100">
+          <button type="button" class="eye-btn" id="eyeBtn" onclick="togglePw()" aria-label="แสดง/ซ่อนรหัสผ่าน">👁️</button>
+        </div>
       </div>
 
-      <button class="btn-login" id="btnLogin" onclick="doLogin()">
+      <div class="error-msg" id="errorMsg" role="alert"></div>
+
+      <button type="submit" class="btn-login" id="btnLogin">
         <span id="btnText">เข้าสู่ระบบ</span>
         <div class="spinner" id="spinner"></div>
       </button>
-    </div>
+    </form>
   </div>
 </div>
 
@@ -401,173 +336,43 @@ function playSaveFail(){
 window.playSaveSuccess = playSaveSuccess;
 window.playSaveFail = playSaveFail;
 
-// ── ขั้นตอนที่ 1: LINE Login (แค่ยืนยันว่าเป็นใคร ยังไม่ให้เข้าระบบ) ──
-function loginWithLine(){
-  const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  // ใช้ localStorage แทน sessionStorage เพราะ in-app browser ของ LINE บางเครื่องล้าง sessionStorage
-  // ระหว่างเปลี่ยนหน้าไปหน้ายืนยันตัวตนของ LINE แล้วกลับมา ทำให้เช็ค state ไม่ได้
-  localStorage.setItem('line_oauth_state', state);
-  const redirectUri = window.location.origin + window.location.pathname;
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: LINE_CHANNEL_ID,
-    redirect_uri: redirectUri,
-    state: state,
-    scope: 'profile openid'
-  });
-  window.location.href = 'https://access.line.me/oauth2/v2.1/authorize?' + params.toString();
+// ── Login (username + password — ตรวจกับชีต "login" ที่ฝั่ง GAS) ──
+const elUser = document.getElementById('username');
+const elPass = document.getElementById('password');
+
+function togglePw(){
+  const show = elPass.type === 'password';
+  elPass.type = show ? 'text' : 'password';
+  document.getElementById('eyeBtn').textContent = show ? '🙈' : '👁️';
 }
 
-function showPending(msg){
-  const el = document.getElementById('pendingMsg');
+function showError(msg){
+  const el = document.getElementById('errorMsg');
   el.textContent = '⚠️ ' + msg;
   el.classList.add('show');
 }
-function clearPending(){
-  document.getElementById('pendingMsg').classList.remove('show');
-}
-
-async function verifyLineLogin(code){
-  const btn = document.getElementById('btnLine');
-  const btnText = document.getElementById('lineBtnText');
-  btn.disabled = true;
-  btnText.textContent = 'กำลังยืนยันตัวตนผ่าน LINE...';
-
-  try {
-    const url = GAS_API_URL + '?action=lineLogin&code=' + encodeURIComponent(code)
-              + '&redirect_uri=' + encodeURIComponent(window.location.origin + window.location.pathname);
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.success) {
-      // ยืนยันตัวตน LINE สำเร็จ — เก็บไว้ชั่วคราว แล้วไปขั้นตอนที่ 2 (ยังไม่ล็อกอินจริง)
-      sessionStorage.setItem('line_pending_userId', data.lineUserId);
-      sessionStorage.setItem('line_pending_name', data.lineName || '');
-      sessionStorage.setItem('line_pending_picture', data.linePicture || '');
-      goToPinStep();
-    } else {
-      playLoginFail();
-      showPending(data.message || 'ยืนยันตัวตนกับ LINE ไม่สำเร็จ กรุณาลองใหม่');
-      btn.disabled = false; btnText.textContent = 'เข้าสู่ระบบด้วย LINE';
-    }
-  } catch(err) {
-    playLoginFail();
-    showPending('เชื่อมต่อไม่สำเร็จ: ' + err.message);
-    btn.disabled = false; btnText.textContent = 'เข้าสู่ระบบด้วย LINE';
-  }
-}
-
-function goToPinStep(){
-  clearPending();
-  const name = sessionStorage.getItem('line_pending_name') || '';
-  const pic = sessionStorage.getItem('line_pending_picture') || '';
-  document.getElementById('lineNameLabel').textContent = name;
-  document.getElementById('lineAvatar').src = pic;
-  document.getElementById('step-line').style.display = 'none';
-  document.getElementById('lineProfileBox').style.display = 'flex';
-  document.getElementById('step-pin').style.display = 'block';
-  setTimeout(()=>document.getElementById('d0').focus(), 100);
-}
-
-function resetLineStep(){
-  sessionStorage.removeItem('line_pending_userId');
-  sessionStorage.removeItem('line_pending_name');
-  sessionStorage.removeItem('line_pending_picture');
-  document.getElementById('step-line').style.display = 'block';
-  document.getElementById('lineProfileBox').style.display = 'none';
-  document.getElementById('step-pin').style.display = 'none';
-  document.getElementById('btnLine').disabled = false;
-  document.getElementById('lineBtnText').textContent = 'เข้าสู่ระบบด้วย LINE';
-  boxes.forEach(b => { b.value=''; b.classList.remove('filled','error','success'); });
-  clearPending(); clearError();
-}
-
-// ── ตรวจว่ากำลังถูก redirect กลับมาจาก LINE หรือไม่ (มี ?code=...&state=...) ──
-(function checkLineCallback(){
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const state = params.get('state');
-  const lineError = params.get('error');
-  if (!code && !lineError) return;
-
-  // ล้าง query string ออกจาก URL กันกดรีเฟรชแล้วยิงซ้ำ
-  history.replaceState({}, document.title, window.location.pathname);
-
-  if (lineError) {
-    showPending('ยกเลิกการเข้าสู่ระบบด้วย LINE');
-    return;
-  }
-  const savedState = localStorage.getItem('line_oauth_state');
-  localStorage.removeItem('line_oauth_state');
-  // ถ้ามีค่า savedState อยู่จริงแต่ไม่ตรงกับ state ที่ได้กลับมา = มีอะไรผิดปกติจริงๆ ให้บล็อก
-  // แต่ถ้า savedState หายไปทั้งหมด (null) มักเกิดจาก in-app browser ล้าง storage ระหว่างทาง
-  // อนุโลมให้ผ่านไปได้ เพราะยังไงก็ต้องผ่านรหัสหน่วย 5 หลักเป็นด่านสิทธิ์จริงอีกชั้นอยู่ดี
-  if (savedState && state !== savedState) {
-    showPending('การยืนยันตัวตนไม่ถูกต้อง (state ไม่ตรงกัน) กรุณาลองใหม่');
-    return;
-  }
-  verifyLineLogin(code);
-})();
-
-// ── OTP Input Logic ──
-const boxes = Array.from(document.querySelectorAll('.otp-box'));
-
-boxes.forEach((box, i) => {
-  box.addEventListener('input', function(e){
-    const val = this.value.replace(/\D/g,'');
-    this.value = val ? val[0] : '';
-    if(val && i < 4) boxes[i+1].focus();
-    updateFilled();
-    playKeyClick();
-    clearError();
-  });
-
-  box.addEventListener('keydown', function(e){
-    if(e.key === 'Backspace' && !this.value && i > 0){
-      boxes[i-1].focus(); boxes[i-1].value = '';
-      updateFilled();
-    }
-    if(e.key === 'Enter') doLogin();
-  });
-
-  box.addEventListener('paste', function(e){
-    e.preventDefault();
-    const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'');
-    paste.split('').slice(0,5).forEach((ch, idx) => {
-      if(boxes[idx]) boxes[idx].value = ch;
-    });
-    updateFilled();
-    const next = Math.min(paste.length, 4);
-    boxes[next].focus();
-  });
-
-  box.addEventListener('focus', function(){
-    this.select();
-  });
-});
-
-// ไม่ auto-focus ช่อง OTP แล้ว เพราะเป็นทางเลือกสำรองที่พับซ่อนไว้ตอนแรก (ใช้ตอนกดปุ่ม "ใช้รหัสหน่วยแทน")
-
-function updateFilled(){
-  boxes.forEach(b => b.classList.toggle('filled', b.value.length > 0));
-}
-
 function clearError(){
   document.getElementById('errorMsg').classList.remove('show');
-  boxes.forEach(b => b.classList.remove('error'));
+  elUser.classList.remove('error'); elPass.classList.remove('error');
 }
-
-function getCode(){
-  return boxes.map(b => b.value).join('');
+function flagField(el){
+  el.classList.add('error');
+  setTimeout(() => el.classList.remove('error'), 600);
 }
+elUser.addEventListener('input', clearError);
+elPass.addEventListener('input', clearError);
 
-// ── Login ──
-async function doLogin(){
-  const code = getCode();
-  if(code.length < 5){
-    // shake empty boxes
-    boxes.forEach(b => { if(!b.value) { b.classList.add('error'); setTimeout(()=>b.classList.remove('error'),500); }});
+async function doLogin(ev){
+  if(ev) ev.preventDefault();
+  const username = elUser.value.trim();
+  const password = elPass.value;
+
+  if(!username || !password){
+    if(!username) flagField(elUser);
+    if(!password) flagField(elPass);
+    showError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
     playLoginFail();
+    (!username ? elUser : elPass).focus();
     return;
   }
 
@@ -579,45 +384,41 @@ async function doLogin(){
   spinner.style.display = 'block';
 
   try {
-    // Call GAS to verify unit number and log access — ส่ง LINE user id ที่ยืนยันไว้จากขั้นตอนที่ 1 ไปด้วย
-    const lineUserId = sessionStorage.getItem('line_pending_userId') || '';
-    const lineName = sessionStorage.getItem('line_pending_name') || '';
-    const url = GAS_API_URL + '?action=login&code=' + encodeURIComponent(code)
-              + '&lineUserId=' + encodeURIComponent(lineUserId)
-              + '&lineName=' + encodeURIComponent(lineName);
-    const res = await fetch(url);
+    // POST — รหัสผ่านอยู่ใน body ไม่ปรากฏใน URL / ประวัติเบราว์เซอร์
+    const res = await fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'login', username: username, password: password })
+    });
     const data = await res.json();
 
     if(data.success){
-      // Save session
-      sessionStorage.setItem('unitName', data.unitName);
-      sessionStorage.setItem('unitCode', code);
-      sessionStorage.setItem('lineUserId', lineUserId);
+      // เคลียร์ค่าเก่าจากระบบเดิม (LINE / รหัสหน่วย) กันค้าง
+      ['unitName','unitCode','lineUserId','line_pending_userId','line_pending_name','line_pending_picture']
+        .forEach(k => sessionStorage.removeItem(k));
+      sessionStorage.setItem('userName', data.name);
+      sessionStorage.setItem('username', data.username || username);
       sessionStorage.setItem('loggedIn', '1');
-      // เคลียร์ค่าชั่วคราวของขั้นตอนที่ 1
-      sessionStorage.removeItem('line_pending_userId');
-      sessionStorage.removeItem('line_pending_name');
-      sessionStorage.removeItem('line_pending_picture');
 
-      // Mark boxes success
-      boxes.forEach(b => b.classList.add('success'));
+      elUser.classList.add('success'); elPass.classList.add('success');
       playLoginSuccess();
 
-      // Show success overlay
-      document.getElementById('successUnit').textContent = data.unitName;
+      document.getElementById('successUnit').textContent = data.name;
       document.getElementById('successOverlay').classList.add('show');
 
       // เริ่ม preload ข้อมูลระหว่างรอ redirect — พอไปถึงหน้าอื่น cache พร้อมแล้ว
       if(window.DataCache) DataCache.preload();
 
-      // Redirect after delay
       setTimeout(() => { window.location.href = 'index.html'; }, 1800);
     } else {
-      showError();
+      flagField(elUser); flagField(elPass);
+      showError(data.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      playLoginFail();
+      elPass.value = '';
+      elPass.focus();
     }
   } catch(err){
-    // Network error — try fallback offline check? No, just show error
-    showError();
+    showError('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+    playLoginFail();
   } finally {
     btn.disabled = false;
     btnText.textContent = 'เข้าสู่ระบบ';
@@ -625,14 +426,7 @@ async function doLogin(){
   }
 }
 
-function showError(){
-  playLoginFail();
-  boxes.forEach(b => { b.classList.add('error'); });
-  document.getElementById('errorMsg').classList.add('show');
-  setTimeout(()=>{ boxes.forEach(b => b.classList.remove('error')); }, 600);
-  // Clear boxes
-  setTimeout(()=>{ boxes.forEach(b => b.value=''); updateFilled(); boxes[0].focus(); }, 800);
-}
+elUser.focus();
 </script>
 <script>if(window.Loader)Loader.hide();</script>
 </body>
