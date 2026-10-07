@@ -417,21 +417,29 @@ window.onload = async function(){ await initPage(); if(window.Loader)Loader.hide
 async function initPage() {
   showPrompt();
   if (!API) return;
-  try {
-    // โหลดแค่รายชื่อแผนก (เร็ว) เพื่อเติม dropdown
-    let depts = [];
-    if (window.DataCache) {
-      const deptMap = await DataCache.getDepts();
-      depts = Object.keys(deptMap||{}).sort();
-    } else {
-      const res = await fetch(API+'?action=getDepts');
-      const map = await res.json() || {};
-      depts = Object.keys(map).sort();
-    }
-    const sel = document.getElementById('f-dept');
+  const sel = document.getElementById('f-dept');
+  const __note=function(){ if(window.psmsNote) psmsNote.apply(null,arguments); }, __why=function(e){ return window.psmsExplain?psmsExplain(e):String((e&&e.message)||e||''); };
+  // โหลดแค่ "ชื่อแผนก" (เล็กมาก/จำไว้ในเครื่อง) เพื่อเติม dropdown
+  const fill = function(depts) {
+    const cur = sel.value;
     sel.innerHTML = '<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
-    depts.forEach(d => sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`);
-  } catch(e) { /* ถ้า getDepts ไม่มี ปล่อยผ่าน — ยังกดแสดงได้ */ }
+    depts.slice().sort().forEach(d => sel.innerHTML += `<option value="${esc(d)}">${esc(d)}</option>`);
+    sel.value = cur;
+  };
+  const run = async function() {
+    if (sel.options.length <= 2) sel.innerHTML = '<option value="">⏳ กำลังโหลดแผนก...</option>';
+    __note(sel, 'loading', 'กำลังโหลดรายชื่อแผนก…');
+    try {
+      let depts;
+      if (window.DataCache) depts = await DataCache.getDeptList(fill);
+      else depts = Object.keys(await (await fetch(API+'?action=getDepts')).json() || {});
+      fill(depts); __note(sel, 'ok');
+    } catch(e) {
+      sel.innerHTML = '<option value="">— โหลดแผนกไม่สำเร็จ —</option><option value="ALL">ทุกแผนก</option>';
+      __note(sel, 'error', 'โหลดแผนกไม่สำเร็จ: '+__why(e), run);
+    }
+  };
+  await run();
 }
 
 function showPrompt() {

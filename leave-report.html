@@ -543,14 +543,28 @@ window.onload = async function(){ var __hid=false; var __hideOnce=function(){if(
   document.getElementById('f-date-from').value=`${y}-${String(m+1).padStart(2,'0')}-01`;
   document.getElementById('f-date-to').value=`${y}-${String(m+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`;
   if(!API) { __hideOnce(); return; }
-  try{
-    let depts=[];
-    if(window.DataCache){const map=await DataCache.getDepts();depts=Object.keys(map||{}).sort();}
-    else{const map=await fetch(API+'?action=getDepts').then(r=>r.json())||{};depts=Object.keys(map).sort();}
-    const sel=document.getElementById('f-dept');
-    sel.innerHTML='<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
-    depts.forEach(d=>sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
-  }catch(e){}
+  const __sel=document.getElementById('f-dept');
+  const __note=function(){ if(window.psmsNote) psmsNote.apply(null,arguments); }, __why=function(e){ return window.psmsExplain?psmsExplain(e):String((e&&e.message)||e||''); };
+  const __fill=function(depts){
+    const cur=__sel.value;
+    __sel.innerHTML='<option value="">— เลือกแผนก —</option><option value="ALL">ทุกแผนก</option>';
+    depts.slice().sort().forEach(d=>__sel.innerHTML+=`<option value="${esc(d)}">${esc(d)}</option>`);
+    __sel.value=cur;
+  };
+  const __loadDepts=async function(){
+    if(__sel.options.length<=2) __sel.innerHTML='<option value="">⏳ กำลังโหลดแผนก...</option>';
+    __note(__sel,'loading','กำลังโหลดรายชื่อแผนก…');
+    try{
+      let depts;
+      if(window.DataCache) depts=await DataCache.getDeptList(__fill);
+      else depts=Object.keys(await fetch(API+'?action=getDepts').then(r=>r.json())||{});
+      __fill(depts); __note(__sel,'ok');
+    }catch(e){
+      __sel.innerHTML='<option value="">— โหลดแผนกไม่สำเร็จ —</option><option value="ALL">ทุกแผนก</option>';
+      __note(__sel,'error','โหลดแผนกไม่สำเร็จ: '+__why(e),__loadDepts);
+    }
+  };
+  await __loadDepts();
   __hideOnce(); // แผนกโหลดเสร็จแล้ว (หรือพัง) — ซ่อน loader ทันที ไม่ต้องรอส่วนอื่น
   // อ่าน mode จาก URL param (?mode=grouped)
   const urlMode = new URLSearchParams(window.location.search).get('mode');

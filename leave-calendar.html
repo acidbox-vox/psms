@@ -260,7 +260,7 @@ function ymd(y,m,d) { return `${y}-${pad(m+1)}-${pad(d)}`; }
 // โหลดเฉพาะ "เดือนที่กำลังดู" จากเซิร์ฟเวอร์ (เดิมดึงประวัติทั้งชีตหมื่นแถวก่อนจะวาดปฏิทินได้)
 // เดือนข้างเคียงโหลดรอไว้เบื้องหลัง กดก่อนหน้า/ถัดไปจึงแทบไม่ต้องรอ
 const knownDepts = new Set();
-let calSeq = 0;
+let calSeq = 0, calBuilt = false;
 function fillDeptOptions() {
   const sel=document.getElementById('f-dept'); const cur=sel.value;
   sel.innerHTML='<option value="">ทุกแผนก</option>';
@@ -275,12 +275,14 @@ async function fetchMonthLeaves(y, m, force) {
 async function loadMonth(force) {
   const seq=++calSeq, y=curYear, m=curMonth;
   const grid=document.getElementById('cal-grid'); grid.style.opacity='0.5';
+  if (!calBuilt) grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">⏳ กำลังโหลดข้อมูลการลา...</div>';
   try {
     const rows = await fetchMonthLeaves(y, m, force);
     if (seq!==calSeq) return;           // ผู้ใช้เปลี่ยนเดือนซ้ำระหว่างรอ — ทิ้งผลเก่า
     leaves = rows;
     rows.forEach(l=>{ if (l.dept) knownDepts.add(l.dept); });
     fillDeptOptions();
+    calBuilt = true;
     buildCalendar();
     [-1,1].forEach(delta=>{ const d=new Date(y,m+delta,1); fetchMonthLeaves(d.getFullYear(),d.getMonth(),false).catch(()=>{}); });
   } catch(e) {
@@ -289,7 +291,13 @@ async function loadMonth(force) {
 }
 async function loadData(force) {
   if (!API) { document.getElementById('cal-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">ยังไม่ตั้งค่า API URL</div>'; return; }
-  if (window.DataCache) DataCache.getDepts(force).then(map=>{ Object.keys(map||{}).forEach(d=>knownDepts.add(d)); fillDeptOptions(); }).catch(()=>{});
+  const addDepts = list => { (list||[]).forEach(d=>knownDepts.add(d)); fillDeptOptions(); };
+  if (window.DataCache) {
+    const sel = document.getElementById('f-dept');
+    if (window.psmsNote) psmsNote(sel, 'loading', 'กำลังโหลดรายชื่อแผนก…');
+    DataCache.getDeptList(addDepts).then(list=>{ addDepts(list); if (window.psmsNote) psmsNote(sel,'ok'); })
+      .catch(e=>{ if (window.psmsNote) psmsNote(sel,'error','โหลดรายชื่อแผนกไม่สำเร็จ: '+psmsExplain(e),()=>loadData(false)); });
+  }
   await loadMonth(force);
 }
 function changeMonth(delta) {

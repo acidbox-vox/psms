@@ -436,8 +436,8 @@ elUser.focus();
 
 // อุ่นเครื่อง GAS ระหว่างที่ผู้ใช้พิมพ์ชื่อผู้ใช้/รหัสผ่าน — ลดอาการ "cold start" ครั้งแรกที่กดล็อกอินช้า
 fetch(GAS_API_URL + '?action=ping').catch(function(){});
-// โหลดแผนกไว้ล่วงหน้าระหว่างที่ผู้ใช้พิมพ์ — พอเข้าระบบแล้วเปิดเมนูไหนก็ได้แผนกทันที (เก็บใน sessionStorage ของแท็บนี้)
-if(window.DataCache) DataCache.getDepts().catch(function(){});
+// โหลดรายชื่อแผนก (เล็กมาก) ไว้ล่วงหน้าระหว่างที่ผู้ใช้พิมพ์ — พอเข้าระบบแล้วเปิดเมนูไหนก็ได้แผนกทันที
+if(window.DataCache) DataCache.getDeptList().catch(function(){});
 </script>
 <script>if(window.Loader)Loader.hide();</script>
 </body>

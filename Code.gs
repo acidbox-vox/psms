@@ -10,6 +10,8 @@ function doGet(e) {
 
   if      (action === 'ping')          result = { ok: true };   // ใช้ "อุ่นเครื่อง" GAS ตอนเปิดหน้าล็อกอิน
   else if (action === 'getDepts')      result = getDepts();
+  else if (action === 'getDeptList')   result = getDeptList();                    // ชื่อแผนกอย่างเดียว (เล็ก เร็ว)
+  else if (action === 'getDeptNames')  result = getDeptNames(e.parameter.dept);   // รายชื่อบุคลากรของแผนกเดียว
   else if (action === 'getLeaves')     result = getLeaves(e.parameter);
   else if (action === 'getStatusData') result = getStatusData();
   else result = { error: 'Unknown action: ' + action };
@@ -159,6 +161,37 @@ function writeLoginLog_(username, name, result) {
 // =============================================================
 const DEPTS_CACHE_KEY = 'depts_v2';
 const DEPTS_CACHE_TTL = 1800; // 30 นาที (ล้างทันทีเมื่อ saveDepts หรือแก้ชีต Departments ด้วยมือ)
+
+const DEPTLIST_CACHE_KEY = 'deptlist_v1';
+
+// รายชื่อแผนกอย่างเดียว — เล็กมาก (ไม่มีรายชื่อบุคคล) ใช้เติม dropdown ให้ขึ้นทันที
+function getDeptList() {
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get(DEPTLIST_CACHE_KEY); if (hit) return JSON.parse(hit); } catch (err) {}
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Departments');
+  if (!sheet) return Object.keys(getDepts());   // getDepts() สร้างชีตเปล่าให้
+
+  const out = [], seen = {};
+  const last = sheet.getLastRow();
+  if (last >= 2) {
+    sheet.getRange(2, 1, last - 1, 2).getValues().forEach(function (row) {
+      const dept = row[0] == null ? '' : String(row[0]).trim();
+      const emps = row[1] == null ? '' : String(row[1]).trim();
+      if (!dept && !emps) return;
+      const key = dept || 'ไม่ระบุ';
+      if (!seen[key]) { seen[key] = true; out.push(key); }
+    });
+  }
+  try { cache.put(DEPTLIST_CACHE_KEY, JSON.stringify(out), DEPTS_CACHE_TTL); } catch (err) {}
+  return out;
+}
+
+// รายชื่อบุคลากรของแผนกเดียว (ใช้ cache เดียวกับ getDepts)
+function getDeptNames(dept) {
+  const all = getDepts();
+  return all[String(dept || '').trim()] || [];
+}
 
 function getDepts() {
   const cache = CacheService.getScriptCache();
@@ -593,7 +626,7 @@ function onEdit(e) {
 }
 
 function invalidateDeptsCache_() {
-  try { CacheService.getScriptCache().remove(DEPTS_CACHE_KEY + '_n'); } catch (err) {}
+  try { CacheService.getScriptCache().removeAll([DEPTS_CACHE_KEY + '_n', DEPTLIST_CACHE_KEY]); } catch (err) {}
 }
 
 function getStatusData() {
