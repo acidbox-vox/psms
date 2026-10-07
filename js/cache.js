@@ -103,6 +103,60 @@
   const DEPT_MAX_STALE = 12 * 60 * 60 * 1000;
   let _deptInflight = null;
 
+  // fetch + JSON พร้อม timeout — ไม่ค้างเงียบๆ ถ้าเซิร์ฟเวอร์ไม่ตอบ
+  async function _fetchJSON(url, ms) {
+    const limit = ms || 25000;
+    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), limit) : null;
+    try {
+      const r = await fetch(url, ctl ? { signal: ctl.signal } : undefined);
+      if (r && r.ok === false) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('หมดเวลารอเซิร์ฟเวอร์ (เกิน ' + Math.round(limit / 1000) + ' วินาที)');
+      throw e;
+    } finally { if (timer) clearTimeout(timer); }
+  }
+
+  // แปลงข้อผิดพลาดดิบเป็นข้อความที่บอกสาเหตุได้
+  global.psmsExplain = function (e) {
+    const m = String((e && e.message) || e || '');
+    if (/Unexpected token|JSON/i.test(m)) return 'เซิร์ฟเวอร์ตอบกลับไม่ใช่ข้อมูล (อาจยังไม่ได้ Deploy เวอร์ชันใหม่ หรือสคริปต์มีข้อผิดพลาด)';
+    if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ตรวจอินเทอร์เน็ต หรือ URL ใน api-config.js)';
+    return m || 'ไม่ทราบสาเหตุ';
+  };
+
+  // ตัวบอกสถานะการโหลดใต้ element ที่ระบุ: state = 'loading' | 'error' | 'ok'(ซ่อน)
+  function _injectCSS() {
+    if (document.getElementById('psms-ui-css')) return;
+    const st = document.createElement('style'); st.id = 'psms-ui-css';
+    st.textContent = '.psms-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.82em;color:#6b7a90;margin:4px 0 10px}' +
+      '.psms-note.error{color:#d93025}' +
+      '.psms-spin{width:14px;height:14px;border:2px solid #cfd8e6;border-top-color:#3b7cf4;border-radius:50%;animation:psmsSpin .7s linear infinite;flex:none}' +
+      '.psms-retry{border:1px solid currentColor;background:transparent;color:inherit;border-radius:8px;padding:2px 10px;font:inherit;cursor:pointer}' +
+      '@keyframes psmsSpin{to{transform:rotate(360deg)}}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+  global.psmsNote = function (target, state, msg, onRetry) {
+    try {
+      _injectCSS();
+      const el = typeof target === 'string' ? document.getElementById(target) : target;
+      if (!el) return;
+      let host = el.nextElementSibling && el.nextElementSibling.classList.contains('psms-note') ? el.nextElementSibling : null;
+      if (!host) { host = document.createElement('div'); el.insertAdjacentElement('afterend', host); }
+      host.innerHTML = '';
+      if (!state || state === 'ok') { host.className = 'psms-note'; host.style.display = 'none'; return; }
+      host.className = 'psms-note ' + state; host.style.display = 'flex';
+      if (state === 'loading') {
+        const sp = document.createElement('span'); sp.className = 'psms-spin'; host.appendChild(sp);
+        const t = document.createElement('span'); t.textContent = msg || 'กำลังโหลด...'; host.appendChild(t);
+      } else {
+        const t = document.createElement('span'); t.textContent = '⚠️ ' + (msg || 'โหลดไม่สำเร็จ'); host.appendChild(t);
+        if (onRetry) { const b = document.createElement('button'); b.type = 'button'; b.className = 'psms-retry'; b.textContent = '🔄 ลองใหม่'; b.onclick = onRetry; host.appendChild(b); }
+      }
+    } catch (e) {}
+  };
+
   function _getEntry(key) {
     try {
       const raw = sessionStorage.getItem(key);
@@ -117,8 +171,7 @@
     if (_deptInflight) return _deptInflight;
     _deptInflight = (async () => {
       try {
-        const r = await fetch(GAS_API_URL + '?action=getDepts');
-        const data = await r.json() || {};
+        const data = await _fetchJSON(GAS_API_URL + '?action=getDepts', 40000) || {};
         if (data.error) throw new Error(data.error);
         _set('cache_depts', data);
         return data;
@@ -139,18 +192,93 @@
     return _fetchDepts();
   }
 
-  // Preload (เรียกจากหน้า index): แผนกก่อน (เล็ก ต้องใช้ทุกเมนู) แล้วค่อยโหลดประวัติการลาเต็มชุดเบื้องหลัง
-  // ไม่รอ/ไม่บล็อกใคร และไม่ใช้ force เพื่อไม่ทิ้ง cache ที่ยังใช้ได้
+  // ── รายชื่อแผนก (เฉพาะชื่อ — ไม่ใช่ชื่อบุคคล) ──
+  // จำไว้ใน localStorage จึงขึ้นทันทีแม้เปิดแท็บใหม่/วันใหม่ แล้วซิงก์กับชีตเบื้องหลัง (onUpdate เมื่อรายการเปลี่ยน)
+  // ลำดับ: จำไว้จากครั้งก่อน → DEPT_SEED ใน api-config.js → ถ้าไม่มีเลยค่อยรอเซิร์ฟเวอร์
+  const LIST_KEY = 'psms_deptlist', LIST_FRESH = 5 * 60 * 1000;
+  let _listInflight = null;
+
+  function _readList() {
+    try {
+      const o = JSON.parse(localStorage.getItem(LIST_KEY) || 'null');
+      return (o && Array.isArray(o.list) && o.list.length) ? o : null;
+    } catch(e) { return null; }
+  }
+  function _seed() {
+    try { return (typeof DEPT_SEED !== 'undefined' && Array.isArray(DEPT_SEED)) ? DEPT_SEED.filter(Boolean) : []; } catch(e) { return []; }
+  }
+  function _fetchList() {
+    if (_listInflight) return _listInflight;
+    _listInflight = (async () => {
+      try {
+        let data = await _fetchJSON(GAS_API_URL + '?action=getDeptList', 30000);
+        if (!Array.isArray(data)) {
+          // GAS เวอร์ชันเก่ายังไม่มี action นี้ (ยังไม่ได้ Deploy ใหม่) → ใช้ getDepts เดิมแทน แล้วเอาเฉพาะชื่อแผนก
+          data = Object.keys(await getDepts() || {});
+        }
+        if (data.length) { try { localStorage.setItem(LIST_KEY, JSON.stringify({ ts: Date.now(), list: data })); } catch(e) {} }
+        return data;
+      } finally { _listInflight = null; }
+    })();
+    return _listInflight;
+  }
+  async function getDeptList(onUpdate) {
+    const cached = _readList();
+    const seed = _seed();
+    const have = cached ? cached.list : (seed.length ? seed : null);
+    if (have) {
+      if (!cached || Date.now() - cached.ts > LIST_FRESH) {
+        _fetchList().then(fresh => {
+          if (onUpdate && fresh.length && JSON.stringify(fresh) !== JSON.stringify(have)) onUpdate(fresh);
+        }).catch(() => {});
+      }
+      return have;
+    }
+    return _fetchList();
+  }
+
+  // ── รายชื่อบุคลากรของแผนกเดียว (โหลดตอนผู้ใช้เลือกแผนก) ──
+  const _namesInflight = {};
+  async function getDeptNames(dept) {
+    const full = _getEntry('cache_depts');                       // มีข้อมูลทั้งหมดอยู่แล้ว → ไม่ต้องยิง
+    if (full && full.data && Array.isArray(full.data[dept]) && Date.now() - full.ts < DEPT_MAX_STALE) return full.data[dept];
+    const key = 'cache_dn:' + dept;
+    const e = _getEntry(key);
+    if (e && Date.now() - e.ts < DEPT_FRESH) return e.data;
+    if (_namesInflight[dept]) return _namesInflight[dept];
+    _namesInflight[dept] = (async () => {
+      try {
+        let data = await _fetchJSON(GAS_API_URL + '?action=getDeptNames&dept=' + encodeURIComponent(dept), 30000);
+        if (!Array.isArray(data)) {
+          // GAS เวอร์ชันเก่า → ดึงทั้งหมดด้วย getDepts แล้วหยิบเฉพาะแผนกนี้
+          const all = await getDepts() || {};
+          data = Array.isArray(all[dept]) ? all[dept] : [];
+        }
+        _set(key, data);
+        return data;
+      } finally { delete _namesInflight[dept]; }
+    })();
+    return _namesInflight[dept];
+  }
+
+  // Preload (เรียกจากหน้า index): รายชื่อแผนก (เล็ก) ก่อน แล้วโหลดรายชื่อบุคลากรทั้งหมดต่อเบื้องหลัง
+  // ไม่โหลดประวัติการลาทั้งชีตล่วงหน้าอีกแล้ว — ทุกหน้าโหลดเฉพาะส่วนที่ใช้เอง (ลดภาระ GAS ตอนเริ่มใช้งาน)
   async function preload() {
-    try { await getDepts(); } catch(e) {}
-    if (!_get('cache_leaves')) getLeaves(false).catch(() => {});
+    try { await getDeptList(); } catch(e) {}
+    getDepts().catch(() => {});
   }
 
   // invalidate เมื่อมีการบันทึก/ลบการลา (ล้างเฉพาะข้อมูลการลา — แผนกไม่เปลี่ยน)
   function invalidate() { _clear(); }
 
   // ล้างทุกอย่างรวมแผนก — ใช้ตอนออกจากระบบ
-  function clearAll() { _clear(); try { sessionStorage.removeItem('cache_depts'); } catch(e) {} }
+  function clearAll() {
+    _clear();
+    try {
+      sessionStorage.removeItem('cache_depts');
+      Object.keys(sessionStorage).forEach(k => { if (k.indexOf('cache_dn:') === 0) sessionStorage.removeItem(k); });
+    } catch(e) {}
+  }
 
   // โหลดไลบรารี Excel (~900KB) เฉพาะตอนต้องใช้ — เดิมใส่เป็น <script> ในหัวหน้า ทำให้ทั้งหน้าต้องรอ
   let _xlsxP = null;
@@ -169,7 +297,7 @@
 
   // ทันทีที่สคริปต์นี้ทำงาน (ก่อน DOM พร้อม) ถ้าล็อกอินแล้วให้เริ่มโหลดแผนกเลย
   // หน้าที่เรียก getDepts() ทีหลังจะได้ของที่มาถึงแล้วหรืออยู่ระหว่างโหลด ไม่ต้องรอ window.onload
-  try { if (sessionStorage.getItem('loggedIn') === '1') getDepts().catch(function () {}); } catch (e) {}
+  try { if (sessionStorage.getItem('loggedIn') === '1') getDeptList().catch(function () {}); } catch (e) {}
 
-  global.DataCache = { getLeaves, getLeavesFiltered, getDepts, preload, invalidate, clearAll };
+  global.DataCache = { getLeaves, getLeavesFiltered, getDepts, getDeptList, getDeptNames, preload, invalidate, clearAll };
 })(window);
