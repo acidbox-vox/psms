@@ -395,6 +395,27 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
   user-select: none;
 }
 #dm-btn:hover { transform: scale(1.13) rotate(18deg); }
+
+/* ── เลือกวันที่แบบรายวัน ── */
+.pick-head { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.pick-head select { flex:1; min-width:0; padding:10px 12px; border-radius:10px; border:1.5px solid var(--border); background:var(--bg); color:var(--text); font-family:'Sarabun',sans-serif; font-size:14px; font-weight:600; }
+.pick-nav { width:40px; height:40px; flex:none; border-radius:10px; border:1.5px solid var(--border); background:var(--surface); color:var(--text2); font-size:14px; cursor:pointer; }
+.pick-nav:hover { border-color:var(--blue); color:var(--blue); }
+.pick-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+.pick-dow { text-align:center; font-size:.72em; font-weight:700; color:var(--text3); padding:4px 0; }
+.pick-dow.sun { color:#ef4444; }
+.pick-day { aspect-ratio:1/1; min-height:40px; border-radius:10px; border:1.5px solid var(--border); background:var(--bg); color:var(--text); font-family:'Sarabun',sans-serif; font-size:14px; font-weight:600; cursor:pointer; transition:all .15s; padding:0; }
+.pick-day:hover { border-color:var(--blue); }
+.pick-day.today { box-shadow:inset 0 0 0 2px rgba(59,124,244,0.35); }
+.pick-day.sel { background:var(--blue); border-color:var(--blue); color:#fff; }
+.pick-day.busy { border-color:#ef4444; background:rgba(239,68,68,0.10); color:#ef4444; }
+.pick-day.sel.busy { background:#ef4444; border-color:#ef4444; color:#fff; }
+.pick-sum { margin-top:12px; font-size:.86em; color:var(--text2); line-height:1.6; }
+.pick-sum .pick-days { color:var(--text); font-weight:600; margin-top:2px; }
+.pick-hint { color:var(--text3); }
+.pick-clear { margin-top:8px; padding:6px 14px; border-radius:8px; border:1.5px solid var(--border); background:var(--surface); color:var(--text2); font-family:'Sarabun',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer; }
+.pick-clear:hover { border-color:#ef4444; color:#ef4444; }
+.pick-legend { margin-top:6px; font-size:.78em; color:#ef4444; }
 </style>
 </head>
 <body>
@@ -485,15 +506,31 @@ html.dark .del-modal-box, html.dark .modal-box { background: var(--surface) !imp
 
   <div class="card">
     <div class="card-lbl"><span class="clbl-dot">📅</span>ช่วงวันที่</div>
-    <div class="date-row">
-      <div>
-        <span class="fld">วันที่ไป</span>
-        <input type="date" id="f-from" onchange="onFieldChange()">
+    <div class="mode-toggle" style="margin-bottom:14px">
+      <button type="button" class="mode-btn active" id="dm-range" onclick="setDateMode('range')">↔️ ช่วงต่อเนื่อง</button>
+      <button type="button" class="mode-btn" id="dm-pick" onclick="setDateMode('pick')">🗓️ เลือกเป็นรายวัน</button>
+    </div>
+    <div id="range-wrap">
+      <div class="date-row">
+        <div>
+          <span class="fld">วันที่ไป</span>
+          <input type="date" id="f-from" onchange="onFieldChange()">
+        </div>
+        <div>
+          <span class="fld">วันที่กลับ</span>
+          <input type="date" id="f-to" onchange="onFieldChange()">
+        </div>
       </div>
-      <div>
-        <span class="fld">วันที่กลับ</span>
-        <input type="date" id="f-to" onchange="onFieldChange()">
+    </div>
+    <div id="pick-wrap" style="display:none">
+      <div class="pick-head">
+        <button type="button" class="pick-nav" onclick="pickShift(-1)" aria-label="เดือนก่อนหน้า">◀</button>
+        <select id="pick-month" onchange="pickSetMonth()" aria-label="เดือน"></select>
+        <select id="pick-year" onchange="pickSetMonth()" aria-label="ปี พ.ศ."></select>
+        <button type="button" class="pick-nav" onclick="pickShift(1)" aria-label="เดือนถัดไป">▶</button>
       </div>
+      <div class="pick-grid" id="pick-grid"></div>
+      <div class="pick-sum" id="pick-sum"></div>
     </div>
   </div>
   </div>
@@ -551,14 +588,15 @@ function highlightMatch(text, q) {
   if (idx === -1) return esc(text);
   return esc(text.slice(0,idx)) + '<mark>' + esc(text.slice(idx,idx+q.length)) + '</mark>' + esc(text.slice(idx+q.length));
 }
-(function(){ const t = new Date().toISOString().split('T')[0]; document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();
+function todayISO() { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+(function(){ const t = todayISO(); document.getElementById('f-from').value = t; document.getElementById('f-to').value = t; })();
 window.onload = async function(){ await initLoad(); };
 // ประวัติการลาใช้เช็ควันซ้ำฝั่งหน้าจอเท่านั้น (เซิร์ฟเวอร์ตรวจซ้ำตอนบันทึกอีกชั้น)
 // จึงโหลดเฉพาะแผนกที่ผู้ใช้เลือก แทนการดึงทั้งชีตหมื่นแถวตั้งแต่เปิดหน้า
 let leavesByDept = {};              // แผนก → รายการลาของแผนกนั้น (รวมที่เพิ่งบันทึกในหน้านี้)
 const deptReq = {};                 // คำขอที่กำลังบินอยู่ (กันยิงซ้ำ)
 let leavesLoadPromise = Promise.resolve();
-function rebuildAllLeaves() { allLeaves = [].concat(...Object.values(leavesByDept)); }
+function rebuildAllLeaves() { allLeaves = [].concat(...Object.values(leavesByDept)); if (typeof dateMode !== 'undefined' && dateMode==='pick') renderPick(); }
 function addLeaveLocal(item) { if (leavesByDept[item.dept]) leavesByDept[item.dept].push(item); allLeaves.push(item); }
 async function fetchDeptLeaves(d) {
   const raw = await (await fetch(API+'?action=getLeaves&compact=1&dept='+encodeURIComponent(d))).json() || [];
@@ -826,15 +864,88 @@ function typeToSave() {
   const type=document.getElementById('f-type').value;
   return TIME_TYPE_SLOTS[type] ? type+'|'+selectedTime : type;
 }
+/* ══════════ เลือกวันที่: ช่วงต่อเนื่อง / เลือกเป็นรายวัน ══════════ */
+let dateMode = 'range';                 // 'range' = วันที่ไป→วันที่กลับ | 'pick' = เลือกวันที่ในปฏิทิน (เช่น 1, 3, 5, 6, 8, 10)
+const pickedDays = new Set();           // 'YYYY-MM-DD' ที่เลือกไว้ (เปลี่ยนเดือนแล้วไม่หาย)
+const PICK_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+let pickY = new Date().getFullYear(), pickM = new Date().getMonth();
+function isoOf(y,m,d) { return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+function nextDay(iso) { const dt=new Date(iso+'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate()+1); return dt.toISOString().slice(0,10); }
+// วันที่ติดกันรวมเป็นช่วงเดียว: 1,3,5,6,8,10 → [1],[3],[5–6],[8],[10]  (แต่ละช่วงบันทึกเป็น 1 รายการ)
+function groupRanges(days) {
+  const out=[];
+  [...days].sort().forEach(d=>{ const last=out[out.length-1]; if (last && nextDay(last.to)===d) last.to=d; else out.push({from:d,to:d}); });
+  return out;
+}
+function daysLabel(days) {
+  const byMonth={};
+  [...days].sort().forEach(d=>{ const k=d.slice(0,7); (byMonth[k]=byMonth[k]||[]).push(d); });
+  return Object.keys(byMonth).map(k=>{
+    const [y,m]=k.split('-');
+    const parts=groupRanges(byMonth[k]).map(r=>r.from===r.to?String(+r.from.slice(8)):`${+r.from.slice(8)}–${+r.to.slice(8)}`);
+    return `${parts.join(', ')} ${TH_M[+m]} ${+y+543}`;
+  }).join(' · ');
+}
+// ช่วงวันที่ที่จะบันทึก ตามโหมดที่เลือก
+function getRanges() {
+  if (dateMode==='pick') return groupRanges(pickedDays);
+  const from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
+  return (from&&to) ? [{from,to}] : [];
+}
+function setDateMode(m) {
+  dateMode = m;
+  document.getElementById('dm-range').className='mode-btn'+(m==='range'?' active':'');
+  document.getElementById('dm-pick').className ='mode-btn'+(m==='pick'?' active':'');
+  document.getElementById('range-wrap').style.display = m==='range'?'':'none';
+  document.getElementById('pick-wrap').style.display  = m==='pick'?'':'none';
+  if (m==='pick') renderPick();
+  onFieldChange();
+}
+function pickShift(delta) { pickM+=delta; if (pickM>11){pickM=0;pickY++;} if (pickM<0){pickM=11;pickY--;} renderPick(); }
+function pickSetMonth() { pickM=+document.getElementById('pick-month').value; pickY=+document.getElementById('pick-year').value; renderPick(); }
+function togglePickDay(k) { if (pickedDays.has(k)) pickedDays.delete(k); else pickedDays.add(k); onFieldChange(); }
+function clearPicked() { pickedDays.clear(); onFieldChange(); }
+function renderPick() {
+  const grid=document.getElementById('pick-grid'); if (!grid) return;
+  const ms=document.getElementById('pick-month'), ys=document.getElementById('pick-year');
+  if (!ms.options.length) ms.innerHTML=PICK_MONTHS.map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+  const nowY=new Date().getFullYear(); let yo='';
+  for (let y=Math.min(nowY-1,pickY); y<=Math.max(nowY+2,pickY); y++) yo+=`<option value="${y}">${y+543}</option>`;
+  if (ys.innerHTML!==yo) ys.innerHTML=yo;
+  ms.value=String(pickM); ys.value=String(pickY);
+
+  // โหมดคนเดียว: ถ้าเลือกชื่อและประเภทแล้ว ให้ขึ้นกรอบแดงที่วันที่ซ้ำกับรายการเดิม
+  const name=currentMode==='single'?document.getElementById('f-name').value:'';
+  const checkBusy=!!name&&isTypeReady(), type=checkBusy?typeToSave():'';
+  const first=new Date(pickY,pickM,1).getDay(), n=new Date(pickY,pickM+1,0).getDate(), today=todayISO();
+  let h=['อา','จ','อ','พ','พฤ','ศ','ส'].map((d,i)=>`<div class="pick-dow${i===0?' sun':''}">${d}</div>`).join('');
+  for (let i=0;i<first;i++) h+='<div></div>';
+  let anyBusy=false;
+  for (let d=1; d<=n; d++) {
+    const k=isoOf(pickY,pickM,d), cls=['pick-day'];
+    if (pickedDays.has(k)) cls.push('sel');
+    if (k===today) cls.push('today');
+    if (checkBusy && findConflicts(name,k,k,type).length) { cls.push('busy'); anyBusy=true; }
+    h+=`<button type="button" class="${cls.join(' ')}" onclick="togglePickDay('${k}')">${d}</button>`;
+  }
+  grid.innerHTML=h;
+
+  const sum=document.getElementById('pick-sum'), ranges=groupRanges(pickedDays);
+  if (!pickedDays.size) sum.innerHTML='<span class="pick-hint">เลือกเดือน แล้วแตะวันที่ต้องการ (แตะซ้ำเพื่อยกเลิก) · เปลี่ยนเดือนได้ วันที่เลือกไว้ไม่หาย</span>';
+  else sum.innerHTML=`<div><b>เลือกแล้ว ${pickedDays.size} วัน</b> · บันทึกเป็น ${ranges.length} รายการ</div><div class="pick-days">${esc(daysLabel(pickedDays))}</div><button type="button" class="pick-clear" onclick="clearPicked()">ล้างที่เลือก</button>`;
+  if (anyBusy) sum.innerHTML+='<div class="pick-legend">กรอบแดง = วันที่ซ้ำกับรายการเดิมของคนนี้</div>';
+}
+
 function onFieldChange() {
   clearTimeout(checkTimer); updatePreviewBasic();
-  const from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, typeReady=isTypeReady();
+  if (dateMode==='pick') renderPick();
+  const ranges=getRanges(), datesOk=ranges.length>0, typeReady=isTypeReady();
   if (currentMode==='single') {
     const name=document.getElementById('f-name').value;
-    if (name&&from&&to&&typeReady) { document.getElementById('btn-save').disabled=true; setCheckStatus('checking','⏳ กำลังตรวจสอบวันที่ว่าง...'); checkTimer=setTimeout(async()=>{ if(leavesLoadPromise) await leavesLoadPromise; checkDuplicate(name,from,to); },300); }
+    if (name&&datesOk&&typeReady) { document.getElementById('btn-save').disabled=true; setCheckStatus('checking','⏳ กำลังตรวจสอบวันที่ว่าง...'); checkTimer=setTimeout(async()=>{ if(leavesLoadPromise) await leavesLoadPromise; checkDuplicate(name,ranges); },300); }
     else setCheckStatus('','');
   } else {
-    const ready=selectedNames.length>0&&from&&to&&typeReady;
+    const ready=selectedNames.length>0&&datesOk&&typeReady;
     document.getElementById('btn-save').disabled=!ready;
     if (!ready) setCheckStatus('',''); else setCheckStatus('ok',`✅ พร้อมบันทึก ${selectedNames.length} คน`);
   }
@@ -858,9 +969,22 @@ function findConflicts(name,newFrom,newTo,type) {
     return true;
   });
 }
-function checkDuplicate(name,newFrom,newTo) {
-  const conflicts=findConflicts(name,newFrom,newTo,typeToSave());
-  if (conflicts.length>0) { const detail=conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n'); setCheckStatus('err',`⚠️ วันที่/เวลาซ้ำกับรายการที่มีอยู่:\n${detail}`); document.getElementById('btn-save').disabled=true; }
+function conflictDetail(conflicts) {
+  return conflicts.map(c=>{ const range=c.dateFrom===c.dateTo?thDate(c.dateFrom):`${thDate(c.dateFrom)} → ${thDate(c.dateTo)}`; return `• ${fmtType(c.leaveType)}: ${range}`; }).join('\n');
+}
+// รายการเดิมที่ชนกับ "ช่วง" ใดช่วงหนึ่ง (ไม่ซ้ำกัน)
+function findConflictsRanges(name,ranges,type) {
+  const set=new Set(); ranges.forEach(r=>findConflicts(name,r.from,r.to,type).forEach(c=>set.add(c))); return [...set];
+}
+function checkDuplicate(name,ranges) {
+  const type=typeToSave();
+  const conflicts=findConflictsRanges(name,ranges,type);
+  if (conflicts.length>0) {
+    let extra='';
+    if (dateMode==='pick') { const bad=[...pickedDays].filter(d=>findConflicts(name,d,d,type).length>0); if (bad.length) extra=`\nวันที่เลือกที่ซ้ำ: ${daysLabel(bad)}`; }
+    setCheckStatus('err',`⚠️ วันที่/เวลาซ้ำกับรายการที่มีอยู่:\n${conflictDetail(conflicts)}${extra}`);
+    document.getElementById('btn-save').disabled=true;
+  }
   else { setCheckStatus('ok','✅ วันที่ว่าง สามารถบันทึกได้'); document.getElementById('btn-save').disabled=!isTypeReady(); }
 }
 function setCheckStatus(type,msg) {
@@ -871,16 +995,17 @@ function setCheckStatus(type,msg) {
 function updatePreviewBasic() {
   const type=document.getElementById('f-type').value, from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, dept=document.getElementById('f-dept').value, box=document.getElementById('preview');
   if (currentMode==='single') {
-    const name=document.getElementById('f-name').value, ok=name&&isTypeReady()&&from&&to;
+    const name=document.getElementById('f-name').value, ok=name&&isTypeReady()&&getRanges().length>0;
     if (!ok) { document.getElementById('btn-save').disabled=true; box.className=''; return; }
-    const dlbl=from===to?thDate(from):`${thDate(from)} → ${thDate(to)}`;
+    const dlbl=dateMode==='pick'?`${pickedDays.size} วัน: ${daysLabel(pickedDays)}`:(from===to?thDate(from):`${thDate(from)} → ${thDate(to)}`);
     const typeLbl = TIME_TYPE_SLOTS[type]&&selectedTime ? `${type} (${selectedTime})` : type;
-    box.innerHTML=`<strong>${TYPE_ICON[type]||''} ${esc(typeLbl)}</strong><br>👤 ${esc(name)} <span style="color:var(--text3)">· ${esc(dept)}</span><br>📅 ${dlbl}`;
+    box.innerHTML=`<strong>${TYPE_ICON[type]||''} ${esc(typeLbl)}</strong><br>👤 ${esc(name)} <span style="color:var(--text3)">· ${esc(dept)}</span><br>📅 ${esc(dlbl)}`;
     box.className='show';
   } else { box.className=''; }
 }
 async function doSave() { if (currentMode==='single') await doSaveSingle(); else await doSaveMulti(); }
 async function doSaveSingle() {
+  if (dateMode==='pick') return doSaveSinglePick();
   await loadDeptLeaves([document.getElementById('f-dept').value]);
   const name=document.getElementById('f-name').value, dept=document.getElementById('f-dept').value, type=typeToSave(), from=document.getElementById('f-from').value, to=document.getElementById('f-to').value;
   const conflicts=findConflicts(name,from,to,type);
@@ -896,6 +1021,7 @@ async function doSaveSingle() {
   btn.disabled=false; btn.innerHTML='💾 บันทึกข้อมูล';
 }
 async function doSaveMulti() {
+  if (dateMode==='pick') return doSaveMultiPick();
   await loadDeptLeaves([document.getElementById('f-dept').value]);
   const dept=document.getElementById('f-dept').value, type=typeToSave(), from=document.getElementById('f-from').value, to=document.getElementById('f-to').value, names=[...selectedNames];
   const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML=`⏳ กำลังบันทึก 0/${names.length}...`;
@@ -913,6 +1039,82 @@ async function doSaveMulti() {
       else { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(data.message||'ไม่สำเร็จ')}</div>`; }
     } catch(e) { prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc(e.message)}</div>`; }
   }
+  prog.innerHTML+=`<br><b>เสร็จสิ้น: บันทึกสำเร็จ ${okCount}/${names.length} คน</b>`;
+  showToast(`✅ บันทึกสำเร็จ ${okCount}/${names.length} คน`,'success');
+  btn.disabled=false; btn.innerHTML='💾 บันทึกข้อมูล';
+  selectedNames=[]; renderSelectedTags();
+  renderNameList(); onFieldChange();
+}
+/* ══════════ บันทึกแบบเลือกเป็นรายวัน ══════════ */
+// ส่งหลายรายการในคำขอเดียว (saveLeaves) — ถ้า GAS ยังเป็นเวอร์ชันเก่าที่ไม่มี action นี้ จะบันทึกทีละรายการแทน
+// คืน results[] ตามลำดับเดียวกับ items: {ok, duplicate, message}
+async function postSaveItems(items) {
+  const results=[];
+  for (let off=0; off<items.length; off+=100) {
+    const chunk=items.slice(off,off+100);
+    try {
+      const r=await fetch(API,{method:'POST',body:JSON.stringify({action:'saveLeaves',items:chunk})});
+      const data=await r.json();
+      if (data && Array.isArray(data.results) && data.results.length===chunk.length) { results.push(...data.results); continue; }
+      for (const it of chunk) {
+        const r2=await fetch(API,{method:'POST',body:JSON.stringify(Object.assign({action:'saveLeave'},it))});
+        const d=await r2.json();
+        results.push({ok:!!d.success,duplicate:!!d.duplicate,message:d.message||''});
+      }
+    } catch(e) {
+      while (results.length<off+chunk.length) results.push({ok:false,message:'เชื่อมต่อไม่ได้: '+e.message});
+    }
+  }
+  return results;
+}
+async function doSaveSinglePick() {
+  const dept=document.getElementById('f-dept').value;
+  await loadDeptLeaves([dept]);
+  const name=document.getElementById('f-name').value, type=typeToSave(), ranges=getRanges();
+  const conflicts=findConflictsRanges(name,ranges,type);
+  if (conflicts.length>0) { document.getElementById('modal-msg').innerText=`${name} มีรายการที่วันที่ซ้ำกันอยู่แล้ว:\n${conflictDetail(conflicts)}`; document.getElementById('modal').classList.add('show'); return; }
+  const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML='⏳ กำลังบันทึก...';
+  const items=ranges.map(r=>({dept,name,leaveType:type,dateFrom:r.from,dateTo:r.to}));
+  const results=await postSaveItems(items);
+  let ok=0; const bad=[];
+  items.forEach((it,i)=>{
+    if (results[i].ok) { ok++; addLeaveLocal({name:it.name,dept:it.dept,leaveType:it.leaveType,dateFrom:it.dateFrom,dateTo:it.dateTo});
+      for (let d=it.dateFrom; d<=it.dateTo; d=nextDay(d)) pickedDays.delete(d); }   // เอาวันที่บันทึกแล้วออก เหลือเฉพาะที่ยังไม่สำเร็จ
+    else bad.push(results[i].message||'ไม่สำเร็จ');
+  });
+  if (window.DataCache) DataCache.invalidate();
+  if (ok===items.length) { showToast(`✅ บันทึกสำเร็จ ${ok} รายการ`,'success'); resetForm(true); }
+  else {
+    document.getElementById('modal-msg').innerText=`บันทึกสำเร็จ ${ok}/${items.length} รายการ\nรายการที่ไม่สำเร็จ (ยังเลือกค้างไว้ให้แล้ว):\n${bad.slice(0,3).join('\n')}`;
+    document.getElementById('modal').classList.add('show');
+    showToast(`⚠️ บันทึกสำเร็จ ${ok}/${items.length} รายการ`,'error');
+  }
+  btn.innerHTML='💾 บันทึกข้อมูล'; onFieldChange();
+}
+async function doSaveMultiPick() {
+  const dept=document.getElementById('f-dept').value, type=typeToSave(), names=[...selectedNames], ranges=getRanges();
+  await loadDeptLeaves([dept]);
+  const btn=document.getElementById('btn-save'); btn.disabled=true; btn.innerHTML=`⏳ กำลังบันทึก ${names.length} คน...`;
+  const prog=document.getElementById('multi-progress'); prog.innerHTML=`<b>กำลังบันทึก ${names.length} คน (${pickedDays.size} วัน)...</b><br>`; prog.className='show';
+  const items=[], owner=[], skipped={};
+  names.forEach((name,ni)=>{
+    if (findConflictsRanges(name,ranges,type).length>0) { skipped[ni]=true; return; }
+    ranges.forEach(r=>{ items.push({dept,name,leaveType:type,dateFrom:r.from,dateTo:r.to}); owner.push(ni); });
+  });
+  const results=items.length?await postSaveItems(items):[];
+  const per=names.map(()=>({ok:0,total:0,msg:''}));
+  results.forEach((r,i)=>{
+    const p=per[owner[i]]; p.total++;
+    if (r.ok) { p.ok++; const it=items[i]; addLeaveLocal({name:it.name,dept:it.dept,leaveType:it.leaveType,dateFrom:it.dateFrom,dateTo:it.dateTo}); }
+    else if (!p.msg) p.msg=r.message||'ไม่สำเร็จ';
+  });
+  let okCount=0;
+  names.forEach((name,ni)=>{
+    if (skipped[ni]) prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — วันที่ซ้ำ</div>`;
+    else if (per[ni].total>0 && per[ni].ok===per[ni].total) { okCount++; prog.innerHTML+=`<div class="prog-item ok">✅ ${esc(name)}</div>`; }
+    else prog.innerHTML+=`<div class="prog-item err">❌ ${esc(name)} — ${esc((per[ni].msg||'ไม่สำเร็จ').split('\n')[0])} (สำเร็จ ${per[ni].ok}/${per[ni].total} รายการ)</div>`;
+  });
+  if (window.DataCache) DataCache.invalidate();
   prog.innerHTML+=`<br><b>เสร็จสิ้น: บันทึกสำเร็จ ${okCount}/${names.length} คน</b>`;
   showToast(`✅ บันทึกสำเร็จ ${okCount}/${names.length} คน`,'success');
   btn.disabled=false; btn.innerHTML='💾 บันทึกข้อมูล';
@@ -1097,7 +1299,8 @@ function resetForm(keepDept) {
   document.getElementById('f-type').value='';
   TYPES.forEach(x=>document.getElementById('tb-'+slug(x)).className=`type-btn t-${slug(x)}`);
   selectedTime=''; document.getElementById('f-time').value=''; document.getElementById('time-card').style.display='none'; document.getElementById('time-grid').innerHTML='';
-  const t=new Date().toISOString().split('T')[0]; document.getElementById('f-from').value=t; document.getElementById('f-to').value=t;
+  const t=todayISO(); document.getElementById('f-from').value=t; document.getElementById('f-to').value=t;
+  pickedDays.clear(); if (dateMode==='pick') renderPick();
   document.getElementById('preview').className=''; document.getElementById('check-status').className=''; document.getElementById('check-status').innerHTML='';
   document.getElementById('multi-progress').className=''; document.getElementById('btn-save').disabled=true;
   importRows = [];
