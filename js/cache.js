@@ -167,11 +167,11 @@
   }
 
   // คำขอ getDepts ที่กำลังบินอยู่ใช้ร่วมกัน — ไม่ยิงซ้ำถ้าหลายส่วนของหน้าเรียกพร้อมกัน
-  function _fetchDepts() {
-    if (_deptInflight) return _deptInflight;
+  function _fetchDepts(force) {
+    if (_deptInflight && !force) return _deptInflight;
     _deptInflight = (async () => {
       try {
-        const data = await _fetchJSON(GAS_API_URL + '?action=getDepts', 40000) || {};
+        const data = await _fetchJSON(GAS_API_URL + '?action=getDepts' + (force ? '&nocache=1' : ''), 40000) || {};
         if (data.error) throw new Error(data.error);
         _set('cache_depts', data);
         return data;
@@ -207,14 +207,14 @@
   function _seed() {
     try { return (typeof DEPT_SEED !== 'undefined' && Array.isArray(DEPT_SEED)) ? DEPT_SEED.filter(Boolean) : []; } catch(e) { return []; }
   }
-  function _fetchList() {
-    if (_listInflight) return _listInflight;
+  function _fetchList(force) {
+    if (_listInflight && !force) return _listInflight;
     _listInflight = (async () => {
       try {
-        let data = await _fetchJSON(GAS_API_URL + '?action=getDeptList', 30000);
+        let data = await _fetchJSON(GAS_API_URL + '?action=getDeptList' + (force ? '&nocache=1' : ''), 30000);
         if (!Array.isArray(data)) {
           // GAS เวอร์ชันเก่ายังไม่มี action นี้ (ยังไม่ได้ Deploy ใหม่) → ใช้ getDepts เดิมแทน แล้วเอาเฉพาะชื่อแผนก
-          data = Object.keys(await getDepts() || {});
+          data = Object.keys(await getDepts(true) || {});
         }
         if (data.length) { try { localStorage.setItem(LIST_KEY, JSON.stringify({ ts: Date.now(), list: data })); } catch(e) {} }
         return data;
@@ -268,6 +268,47 @@
     getDepts().catch(() => {});
   }
 
+  // ── ปุ่ม "อัปเดตข้อมูล" ──
+  // ล้างแคชแผนก/บุคลากรทั้งในเบราว์เซอร์และบนเซิร์ฟเวอร์ แล้วดึงจากชีตใหม่ทันที
+  async function refreshDepts() {
+    try {
+      localStorage.removeItem(LIST_KEY);
+      sessionStorage.removeItem('cache_depts');
+      Object.keys(sessionStorage).forEach(k => { if (k.indexOf('cache_dn:') === 0) sessionStorage.removeItem(k); });
+    } catch(e) {}
+    _clear();                       // ล้างข้อมูลการลาที่แคชไว้ด้วย
+    await _fetchList(true);         // ตัวแรกสั่งเซิร์ฟเวอร์ล้าง cache ของมันเอง
+    await _fetchDepts(true);
+  }
+
+  function _addRefreshButton() {
+    try {
+      if (sessionStorage.getItem('loggedIn') !== '1') return;      // ไม่แสดงในหน้าล็อกอิน
+      if (document.getElementById('psms-refresh-btn')) return;
+      const b = document.createElement('button');
+      b.id = 'psms-refresh-btn'; b.type = 'button';
+      b.title = 'อัปเดตข้อมูลแผนก/บุคลากรจากชีตล่าสุด';
+      b.textContent = '🔄 อัปเดตข้อมูล';
+      b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9998;padding:9px 14px;border-radius:22px;' +
+        'background:#fff;border:1.5px solid #e2e8f0;box-shadow:0 2px 12px rgba(26,35,64,.15);cursor:pointer;' +
+        "font-family:'Sarabun',sans-serif;font-size:.8em;font-weight:700;color:#3b7cf4";
+      b.onclick = async function () {
+        b.disabled = true; b.textContent = '⏳ กำลังอัปเดต...';
+        try {
+          await refreshDepts();
+          b.textContent = '✅ อัปเดตแล้ว';
+          setTimeout(function () { location.reload(); }, 400);   // โหลดหน้าใหม่ให้ dropdown ใช้ข้อมูลล่าสุด
+        } catch (e) {
+          b.disabled = false; b.textContent = '⚠️ ไม่สำเร็จ ลองใหม่';
+          try { alert('อัปเดตไม่สำเร็จ: ' + global.psmsExplain(e)); } catch (e2) {}
+        }
+      };
+      document.body.appendChild(b);
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _addRefreshButton);
+  else _addRefreshButton();
+
   // invalidate เมื่อมีการบันทึก/ลบการลา (ล้างเฉพาะข้อมูลการลา — แผนกไม่เปลี่ยน)
   function invalidate() { _clear(); }
 
@@ -299,5 +340,5 @@
   // หน้าที่เรียก getDepts() ทีหลังจะได้ของที่มาถึงแล้วหรืออยู่ระหว่างโหลด ไม่ต้องรอ window.onload
   try { if (sessionStorage.getItem('loggedIn') === '1') getDeptList().catch(function () {}); } catch (e) {}
 
-  global.DataCache = { getLeaves, getLeavesFiltered, getDepts, getDeptList, getDeptNames, preload, invalidate, clearAll };
+  global.DataCache = { getLeaves, getLeavesFiltered, getDepts, getDeptList, getDeptNames, refreshDepts, preload, invalidate, clearAll };
 })(window);
