@@ -260,6 +260,8 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 .sign-field label{font-size:.76em;font-weight:700;color:var(--text2)}
 .sign-date-row{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:8px}
 .sign-hint{font-size:.7em;color:var(--text3)}
+.sign-117-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}
+.sign-sep{border:none;border-top:1px dashed var(--border);margin:4px 0 14px}
 .sign-preview-lbl{font-size:.7em;font-weight:700;letter-spacing:.06em;color:var(--text3);margin:4px 0 6px}
 .sign-preview{border:1.5px dashed var(--border);border-radius:10px;background:var(--bg);
   padding:12px 10px;display:flex;justify-content:center;overflow-x:auto}
@@ -424,6 +426,18 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
   <div class="sign-box" role="dialog" aria-modal="true" aria-labelledby="sign-title">
     <h3 id="sign-title">✍️ ข้อมูลผู้ตรวจรายงาน</h3>
     <div class="sign-sub" id="sign-sub">กรอกข้อมูลสำหรับส่วนท้ายรายงาน (เว้นว่างได้ — จะแสดงเป็นเส้นประให้เขียนเอง)</div>
+
+    <div class="sign-field">
+      <label>🔢 11-7 เลขที่ <span style="font-weight:400;color:var(--text3)">(ไม่บังคับ — กรอกได้ 1–5 รหัส)</span></label>
+      <div class="sign-117-row">
+        <input type="text" id="sg-117-1" placeholder="รหัสที่ 1" autocomplete="off">
+        <input type="text" id="sg-117-2" placeholder="รหัสที่ 2" autocomplete="off">
+        <input type="text" id="sg-117-3" placeholder="รหัสที่ 3" autocomplete="off">
+        <input type="text" id="sg-117-4" placeholder="รหัสที่ 4" autocomplete="off">
+        <input type="text" id="sg-117-5" placeholder="รหัสที่ 5" autocomplete="off">
+      </div>
+    </div>
+    <hr class="sign-sep">
 
     <div class="sign-field">
       <label for="sg-rank">ยศ</label>
@@ -934,6 +948,11 @@ function openSignModal(action){
   document.getElementById('sg-day').value   = base.day||'';
   document.getElementById('sg-month').value = base.month||'';
   document.getElementById('sg-year').value  = base.year||'';
+  // 11-7: ดึงค่าที่กรอกไว้ในหน้ารายงานมาใส่ (ถ้ามี)
+  for(let i=1;i<=5;i++){
+    const pill = document.getElementById('p117-'+i);
+    document.getElementById('sg-117-'+i).value = pill ? pill.textContent.trim() : '';
+  }
   const ok = document.getElementById('sign-ok');
   ok.className = 'btn ' + (action==='pdf' ? 'btn-print' : 'btn-excel');
   ok.textContent = action==='pdf' ? '🖨️ ต่อไป: พิมพ์ / PDF' : '📊 ต่อไป: Export Excel';
@@ -951,6 +970,11 @@ function confirmSign(){
   signData = d;
   try{ localStorage.setItem(SIGN_KEY, JSON.stringify({rank:d.rank, name:d.name, position:d.position})); }catch(e){}
   // อัปเดตเฉพาะส่วนลงชื่อ (ไม่ render ทั้งรายงานใหม่ เพื่อไม่ให้ช่อง 11-7 ที่กรอกไว้หาย)
+  // 11-7: เขียนกลับลงช่องในรายงาน (พิมพ์/Excel อ่านจากช่องเหล่านี้) — เว้นว่างได้
+  for(let i=1;i<=5;i++){
+    const pill = document.getElementById('p117-'+i);
+    if(pill) pill.textContent = document.getElementById('sg-117-'+i).value.trim();
+  }
   const slot = document.getElementById('sig-slot');
   if(slot) slot.innerHTML = sigInnerHTML(d);
   closeSignModal();
