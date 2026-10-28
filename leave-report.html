@@ -246,6 +246,32 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 .pst-spinner{width:10px;height:10px;border:1.5px solid rgba(59,124,244,.2);border-top-color:var(--blue);
   border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
 
+
+/* ── Sign modal (ข้อมูลผู้ตรวจ ก่อนพิมพ์ PDF / Export Excel) ── */
+.sign-ov{display:none;position:fixed;inset:0;z-index:300;background:rgba(26,35,64,.45);
+  backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px}
+.sign-ov.show{display:flex}
+.sign-box{background:#fff;border:1.5px solid var(--border);border-radius:20px;padding:26px 24px;
+  max-width:460px;width:100%;max-height:92vh;overflow-y:auto;animation:fadeUp .25s ease;
+  box-shadow:0 20px 60px rgba(26,35,64,.15)}
+.sign-box h3{font-size:1.05em;font-weight:800;margin-bottom:4px}
+.sign-sub{font-size:.78em;color:var(--text3);margin-bottom:16px;line-height:1.5}
+.sign-field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.sign-field label{font-size:.76em;font-weight:700;color:var(--text2)}
+.sign-date-row{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:8px}
+.sign-hint{font-size:.7em;color:var(--text3)}
+.sign-preview-lbl{font-size:.7em;font-weight:700;letter-spacing:.06em;color:var(--text3);margin:4px 0 6px}
+.sign-preview{border:1.5px dashed var(--border);border-radius:10px;background:var(--bg);
+  padding:12px 10px;display:flex;justify-content:center;overflow-x:auto}
+.sign-err{color:#dc2626;font-size:.78em;font-weight:600;min-height:18px;margin-top:8px}
+.sign-btns{display:flex;gap:10px;margin-top:6px}
+.sign-btns .btn{flex:1}
+/* ส่วนลงชื่อท้ายรายงาน */
+.sig-block.sig-center{align-items:center;text-align:center;min-width:300px;gap:3px;color:var(--text)}
+.sig-block.sig-center .sig-title{font-size:.9em;color:var(--text2)}
+.sig-block.sig-center .sig-gap{height:26px}
+@media print{ .rpt-cert{page-break-inside:avoid;break-inside:avoid} }
+
 /* ── PRINT ── */
 @media print{
   @page{size:A4 portrait;margin:15mm 14mm 18mm 14mm}
@@ -373,8 +399,8 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
     <div class="btn-row" style="margin-top:4px">
       <button class="btn btn-primary" onclick="doSearch()">🔍 แสดงรายงาน</button>
       <button class="btn btn-ghost" onclick="clearFilters()">✕ ล้างทั้งหมด</button>
-      <button class="btn btn-print" id="btn-pdf" style="display:none" onclick="printReport()">🖨️ พิมพ์ / PDF</button>
-      <button class="btn btn-excel" id="btn-excel" style="display:none" onclick="exportExcel()">📊 Export Excel</button>
+      <button class="btn btn-print" id="btn-pdf" style="display:none" onclick="openSignModal('pdf')">🖨️ พิมพ์ / PDF</button>
+      <button class="btn btn-excel" id="btn-excel" style="display:none" onclick="openSignModal('excel')">📊 Export Excel</button>
     </div>
   </div>
 
@@ -388,11 +414,51 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
   </div>
 </div>
 
+<!-- ═══ Pop-up กรอกข้อมูลผู้ตรวจ ก่อนพิมพ์ PDF / Export Excel ═══ -->
+<div class="sign-ov no-print" id="sign-modal" onclick="if(event.target===this)closeSignModal()">
+  <div class="sign-box" role="dialog" aria-modal="true" aria-labelledby="sign-title">
+    <h3 id="sign-title">✍️ ข้อมูลผู้ตรวจรายงาน</h3>
+    <div class="sign-sub" id="sign-sub">กรอกข้อมูลสำหรับส่วนท้ายรายงาน (เว้นว่างได้ — จะแสดงเป็นเส้นประให้เขียนเอง)</div>
+
+    <div class="sign-field">
+      <label for="sg-rank">ยศ</label>
+      <div class="sel-wrap"><select id="sg-rank" onchange="updateSignPreview()"></select></div>
+    </div>
+    <div class="sign-field">
+      <label for="sg-name">ชื่อ - นามสกุล</label>
+      <input type="text" id="sg-name" placeholder="เช่น สมชาย ใจดี" autocomplete="off" oninput="updateSignPreview()">
+    </div>
+    <div class="sign-field">
+      <label for="sg-pos">ตำแหน่ง</label>
+      <input type="text" id="sg-pos" placeholder="พิมพ์ตำแหน่ง" autocomplete="off" oninput="updateSignPreview()">
+    </div>
+    <div class="sign-field">
+      <label>วันที่ <span style="font-weight:400;color:var(--text3)">(วัน / เดือน / พ.ศ. 2 หลักท้าย)</span></label>
+      <div class="sign-date-row">
+        <input type="text" id="sg-day" inputmode="numeric" maxlength="2" placeholder="วัน" autocomplete="off" oninput="updateSignPreview()">
+        <div class="sel-wrap"><select id="sg-month" onchange="updateSignPreview()"></select></div>
+        <input type="text" id="sg-year" inputmode="numeric" maxlength="2" placeholder="พ.ศ." autocomplete="off" oninput="updateSignPreview()">
+      </div>
+      <div class="sign-hint">ค่าเริ่มต้น = วันที่/เดือนที่พิมพ์ (แก้ไขได้)</div>
+    </div>
+
+    <div class="sign-preview-lbl">ตัวอย่างที่จะขึ้นในรายงาน</div>
+    <div class="sign-preview"><div class="sig-block sig-center" id="sign-preview"></div></div>
+    <div class="sign-err" id="sign-err"></div>
+
+    <div class="sign-btns">
+      <button class="btn btn-ghost" onclick="closeSignModal()">ยกเลิก</button>
+      <button class="btn btn-print" id="sign-ok" onclick="confirmSign()">🖨️ ต่อไป: พิมพ์ / PDF</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = localStorage.getItem('gasApiUrl') || GAS_API_URL;
 let allData   = [];
 let dataLoaded = false;
 let currentMode = 'month';
+let reportMode = 'normal'; // 'normal' | 'grouped'  (เดิมไม่ได้ประกาศไว้ ทำให้ renderReport error ถ้าไม่ได้กดสลับโหมดก่อน)
 let selectedPeople = []; // รายชื่อที่เลือก (array of strings)
 
 const TH_M_FULL  = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
@@ -793,6 +859,100 @@ function filterRows(){
   });
 }
 
+/* ── ข้อมูลผู้ตรวจ/ลงนามท้ายรายงาน ── */
+const RANKS = ['น.อ.','น.อ.หญิง','น.ท.','น.ท.หญิง','น.ต.','น.ต.หญิง','ร.อ.','ร.อ.หญิง','ร.ท.','ร.ท.หญิง','ร.ต.','ร.ต.หญิง',
+               'พ.อ.อ.','พ.อ.อ.หญิง','พ.อ.ท.','พ.อ.ท.หญิง','พ.อ.ต.','พ.อ.ต.หญิง','จ.อ.','จ.อ.หญิง','จ.ท.','จ.ท.หญิง','จ.ต.','จ.ต.หญิง',
+               'นาย','นาง','น.ส.'];
+const SIGN_KEY = 'psmsReportSign';   // จำ ยศ/ชื่อ/ตำแหน่ง ไว้ในเครื่อง (วันที่ไม่จำ — ใช้วันที่พิมพ์เสมอ)
+let signData = null;                 // null = ยังไม่กรอก → แสดงเส้นประ
+let signAction = 'pdf';
+
+function sigParts(d){
+  d = d || {};
+  const DOTS = '...................................................................';
+  return {
+    rank: d.rank || DOTS,
+    name: '(' + (d.name || DOTS) + ')',
+    position: d.position || DOTS,
+    date: 'วันที่ ' + [ d.day || '............',
+                        d.month ? TH_M_SHORT[+d.month] : '.........................',
+                        d.year || '...................' ].join(' / ')
+  };
+}
+function sigInnerHTML(d){
+  const p = sigParts(d);
+  return `<div class="sig-title">ตรวจถูกต้องแล้ว</div><div class="sig-gap"></div>
+    <div>${esc(p.rank)}</div>
+    <div>${esc(p.name)}</div>
+    <div>${esc(p.position)}</div>
+    <div style="margin-top:2px">${esc(p.date)}</div>`;
+}
+function readSignForm(){
+  return {
+    rank:     document.getElementById('sg-rank').value,
+    name:     document.getElementById('sg-name').value.trim(),
+    position: document.getElementById('sg-pos').value.trim(),
+    day:      document.getElementById('sg-day').value.replace(/\D/g,''),
+    month:    document.getElementById('sg-month').value,
+    year:     document.getElementById('sg-year').value.replace(/\D/g,'').slice(-2)
+  };
+}
+function updateSignPreview(){
+  document.getElementById('sign-preview').innerHTML = sigInnerHTML(readSignForm());
+  document.getElementById('sign-err').textContent = '';
+}
+function buildSignOptions(){
+  document.getElementById('sg-rank').innerHTML =
+    '<option value="">— เลือกยศ —</option>' + RANKS.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+  document.getElementById('sg-month').innerHTML =
+    '<option value="">— เดือน —</option>' + TH_M_SHORT.slice(1).map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+}
+function openSignModal(action){
+  signAction = action;
+  if(!document.getElementById('sg-rank').options.length) buildSignOptions();
+  let base = signData;
+  if(!base){
+    let saved = {};
+    try{ saved = JSON.parse(localStorage.getItem(SIGN_KEY)||'{}') || {}; }catch(e){}
+    const n = new Date();
+    base = { rank:saved.rank||'', name:saved.name||'', position:saved.position||'',
+             day:String(n.getDate()), month:String(n.getMonth()+1), year:String(n.getFullYear()+543).slice(-2) };
+  }
+  document.getElementById('sg-rank').value  = RANKS.includes(base.rank) ? base.rank : '';
+  document.getElementById('sg-name').value  = base.name||'';
+  document.getElementById('sg-pos').value   = base.position||'';
+  document.getElementById('sg-day').value   = base.day||'';
+  document.getElementById('sg-month').value = base.month||'';
+  document.getElementById('sg-year').value  = base.year||'';
+  const ok = document.getElementById('sign-ok');
+  ok.className = 'btn ' + (action==='pdf' ? 'btn-print' : 'btn-excel');
+  ok.textContent = action==='pdf' ? '🖨️ ต่อไป: พิมพ์ / PDF' : '📊 ต่อไป: Export Excel';
+  updateSignPreview();
+  document.getElementById('sign-modal').classList.add('show');
+  setTimeout(()=>document.getElementById('sg-rank').focus(), 50);
+}
+function closeSignModal(){ document.getElementById('sign-modal').classList.remove('show'); }
+function confirmSign(){
+  const d = readSignForm();
+  if(d.day && (+d.day<1 || +d.day>31)){
+    document.getElementById('sign-err').textContent = '⚠️ วันที่ต้องอยู่ระหว่าง 1–31';
+    return;
+  }
+  signData = d;
+  try{ localStorage.setItem(SIGN_KEY, JSON.stringify({rank:d.rank, name:d.name, position:d.position})); }catch(e){}
+  // อัปเดตเฉพาะส่วนลงชื่อ (ไม่ render ทั้งรายงานใหม่ เพื่อไม่ให้ช่อง 11-7 ที่กรอกไว้หาย)
+  const slot = document.getElementById('sig-slot');
+  if(slot) slot.innerHTML = sigInnerHTML(d);
+  closeSignModal();
+  if(signAction === 'pdf') setTimeout(printReport, 80);
+  else exportExcel();
+}
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('sign-modal').classList.contains('show')) return;
+  if(e.key === 'Escape') closeSignModal();
+  else if(e.key === 'Enter' && e.target.tagName !== 'SELECT') { e.preventDefault(); confirmSign(); }
+});
+
 /* ── Render report (screen + print) ── */
 function renderReport(){
   const dept=document.getElementById('f-dept').value;
@@ -1006,12 +1166,7 @@ function renderReport(){
        <span style="display: block; padding-left: 5.5em;">ในการเบิกค่าล่วงเวลา ไปราชการ หรือศึกษาต่อ</span>
     </p>
     <div class="sig-line">
-      <div class="sig-block">
-        <div style="font-size:.85em;color:var(--text2);margin-bottom:2px">ตรวจถูกต้องแล้ว</div>
-        <div class="sig-dots">...................................................................</div>
-        <div>(...................................................................)</div>
-        <div style="margin-top:2px">วันที่............/........................./...................</div>
-      </div>
+      <div class="sig-block sig-center" id="sig-slot">${sigInnerHTML(signData)}</div>
     </div>
   </div>`;
 
@@ -1110,11 +1265,17 @@ function doExportExcel(rows){
   const wsData=[...titleRows, headers, ...data];
   wsData.push([]);
   wsData.push(['ขอรับรองว่ารายชื่อตามรายงานสถานะการจำหน่ายกำลังพลนี้ไม่ซ้ำซ้อนกัน ในการเบิกค่าล่วงเวลา ไปราชการ หรือศึกษาต่อ']);
-  wsData.push(['ตรวจถูกต้องแล้ว']);
+  // ส่วนลงชื่อ: วางชิดขวา (เริ่มคอลัมน์ที่ 3 จากท้าย) ใช้ข้อมูลจาก pop-up
+  const sp = sigParts(signData);
+  const sigCol = Math.max(0, headers.length - 3);
+  const sigRow = t => { const r = new Array(sigCol).fill(null); r.push(t); return r; };
   wsData.push([]);
-  wsData.push(['ลงชื่อ ......................................']);
-  wsData.push(['       (.....................................)']);
-  wsData.push(['วันที่ ........./........./..........']);
+  wsData.push(sigRow('ตรวจถูกต้องแล้ว'));
+  wsData.push([]);
+  wsData.push(sigRow(sp.rank));
+  wsData.push(sigRow(sp.name));
+  wsData.push(sigRow(sp.position));
+  wsData.push(sigRow(sp.date));
 
   const ws=XLSX.utils.aoa_to_sheet(wsData);
 
