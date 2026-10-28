@@ -267,7 +267,12 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle}
 .sign-btns{display:flex;gap:10px;margin-top:6px}
 .sign-btns .btn{flex:1}
 /* ส่วนลงชื่อท้ายรายงาน */
-.sig-block.sig-center{align-items:center;text-align:center;min-width:300px;gap:3px;color:var(--text)}
+.sig-block.sig-center{align-items:flex-start;text-align:left;min-width:300px;gap:3px;color:var(--text)}
+.sig-block.sig-center>div{white-space:nowrap}
+.sig-ind{visibility:hidden}
+.sig-row{display:flex}
+.sig-col{display:grid;grid-template-columns:max-content}      /* ความกว้างคอลัมน์ = ความกว้างบรรทัดชื่อ */
+.sig-c{display:flex;justify-content:center;contain:inline-size;white-space:nowrap}  /* จัดกลางตามบรรทัดชื่อ (ยาวกว่าก็ล้นสองข้างเท่ากัน) */
 .sig-block.sig-center .sig-title{font-size:.9em;color:var(--text2)}
 .sig-block.sig-center .sig-gap{height:26px}
 @media print{ .rpt-cert{page-break-inside:avoid;break-inside:avoid} }
@@ -874,18 +879,23 @@ function sigParts(d){
     rank: d.rank || DOTS,
     name: '(' + (d.name || DOTS) + ')',
     position: d.position || DOTS,
-    date: 'วันที่ ' + [ d.day || '............',
+    date: [ d.day || '............',
                         d.month ? TH_M_SHORT[+d.month] : '.........................',
                         d.year || '...................' ].join(' / ')
   };
 }
 function sigInnerHTML(d){
   const p = sigParts(d);
+  // ชื่ออยู่ใต้ยศโดยเริ่มตรงขอบขวายศ (ใช้ตัวยศแบบมองไม่เห็นเป็นตัวดัน)
+  // ตำแหน่ง/วันที่ จัดกึ่งกลางตามบรรทัดชื่อ
+  const ind = (d && d.rank) ? `<span class="sig-ind" aria-hidden="true">${esc(d.rank)}</span>` : '';
   return `<div class="sig-title">ตรวจถูกต้องแล้ว</div><div class="sig-gap"></div>
     <div>${esc(p.rank)}</div>
-    <div>${esc(p.name)}</div>
-    <div>${esc(p.position)}</div>
-    <div style="margin-top:2px">${esc(p.date)}</div>`;
+    <div class="sig-row">${ind}<div class="sig-col">
+      <div>${esc(p.name)}</div>
+      <div class="sig-c">${esc(p.position)}</div>
+      <div class="sig-c" style="margin-top:2px">${esc(p.date)}</div>
+    </div></div>`;
 }
 function readSignForm(){
   return {
@@ -1273,9 +1283,12 @@ function doExportExcel(rows){
   wsData.push(sigRow('ตรวจถูกต้องแล้ว'));
   wsData.push([]);
   wsData.push(sigRow(sp.rank));
-  wsData.push(sigRow(sp.name));
-  wsData.push(sigRow(sp.position));
-  wsData.push(sigRow(sp.date));
+  // Excel จัดกลางจริงไม่ได้ จึงเว้นด้วยช่องว่างประมาณเอา: ชื่อเริ่มท้ายยศ, ตำแหน่ง/วันที่ กึ่งกลางตามชื่อ
+  const rl = (signData && signData.rank) ? signData.rank.length + 1 : 0;
+  const ctr = t => ' '.repeat(Math.max(0, rl + Math.round((sp.name.length - t.length) / 2)));
+  wsData.push(sigRow(' '.repeat(rl) + sp.name));
+  wsData.push(sigRow(ctr(sp.position) + sp.position));
+  wsData.push(sigRow(ctr(sp.date) + sp.date));
 
   const ws=XLSX.utils.aoa_to_sheet(wsData);
 
